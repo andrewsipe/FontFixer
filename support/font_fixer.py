@@ -6,7 +6,7 @@ and correction using table handlers.
 """
 
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 try:
     from fontTools.ttLib import TTFont, TTLibError
@@ -14,8 +14,16 @@ except ImportError:
     TTFont = None  # Type hint fallback
     TTLibError = Exception
 
-from .data_models import FontFixResult
+from .data_models import (
+    FontFixResult,
+    HANDLER_OS2,
+    HANDLER_STYLE,
+    HANDLER_GLYPH,
+    HANDLER_KERN,
+    HANDLER_NAME,
+)
 from .corruption_detection import CorruptionDetector
+from .handlers.base_handler import TableHandler
 from .handlers import (
     OS2TableHandler,
     StyleConsistencyHandler,
@@ -23,6 +31,16 @@ from .handlers import (
     KernHandler,
     NameTableHandler,
 )
+
+# Define handler classes in execution order
+# This allows lazy instantiation - only create handlers that will be used
+HANDLER_CLASSES = [
+    (OS2TableHandler, HANDLER_OS2.full_name),
+    (StyleConsistencyHandler, HANDLER_STYLE.full_name),
+    (GlyphHandler, HANDLER_GLYPH.full_name),
+    (KernHandler, HANDLER_KERN.full_name),
+    (NameTableHandler, HANDLER_NAME.full_name),
+]
 
 try:
     import FontCore.core_console_styles as cs
@@ -198,24 +216,15 @@ class FontFixer:
                     font = TTFont(font_path, recalcBBoxes=False, recalcTimestamp=False)
                     font.flavor = original_flavor
 
-            # Create all handlers in dependency order
-            # CRITICAL: This order must be preserved
-            # 1. OS2 must run first (upgrades table version, enables v4 features)
-            # 2. Style depends on OS/2 version being current
-            # 3. Glyph, Kern, Name are independent but run after foundation is solid
-            handlers = [
-                OS2TableHandler(font, self.verbose),
-                StyleConsistencyHandler(font, self.verbose),  # Depends on OS/2 v4
-                GlyphHandler(font, self.verbose),
-                KernHandler(font, self.verbose),
-                NameTableHandler(font, self.verbose),
-            ]
-
-            # Filter handlers if specific ones are enabled
-            if self.enabled_handlers:
-                handlers = [
-                    h for h in handlers if h.get_table_name() in self.enabled_handlers
-                ]
+            # Only instantiate handlers that will be used
+            # This maintains execution order while avoiding unnecessary instantiation
+            handlers: List[TableHandler] = []
+            for handler_cls, handler_name in HANDLER_CLASSES:
+                if (
+                    self.enabled_handlers is None
+                    or handler_name in self.enabled_handlers
+                ):
+                    handlers.append(handler_cls(font, self.verbose))
 
             any_changed = False
 
@@ -311,6 +320,8 @@ class FontFixer:
                     )
 
                 # Attempt to save with improved error handling
+                # Note: corruption_handler will set result.success = False if corruption detected
+                # and handle quarantine. If save succeeds without exception, we set success flags below.
                 with self.corruption_detector.corruption_handler(
                     font_path,
                     result,
@@ -320,6 +331,7 @@ class FontFixer:
                     font=font,
                 ):
                     font.save(str(output_path))
+                    # Only set success flags if save completed without exception
                     result.success = True
                     result.was_modified = True
                     result.output_path = str(output_path)

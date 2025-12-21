@@ -12,7 +12,8 @@ import argparse
 import multiprocessing as mp
 import traceback
 from pathlib import Path
-from typing import Optional, Tuple, Dict, NamedTuple
+from typing import Optional, Tuple, Dict
+from dataclasses import dataclass
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 try:
@@ -93,7 +94,8 @@ except ImportError:
 # ============================================================================
 
 
-class ProcessingConfig(NamedTuple):
+@dataclass
+class ProcessingConfig:
     """Configuration for font processing run."""
 
     input_path: Path
@@ -107,6 +109,37 @@ class ProcessingConfig(NamedTuple):
     quarantine_enabled: bool
     quarantine_dir: Optional[Path]
     input_root: Path
+
+    @classmethod
+    def from_args(cls, args: argparse.Namespace) -> "ProcessingConfig":
+        """Create config from parsed arguments."""
+        input_root = (
+            args.input_path if args.input_path.is_dir() else args.input_path.parent
+        )
+        quarantine_enabled = not args.no_quarantine
+        quarantine_dir = input_root / "_quarantine" if quarantine_enabled else None
+        num_workers = mp.cpu_count() if args.jobs == 0 else args.jobs
+
+        enabled_handlers = _parse_handler_selection(args)
+
+        return cls(
+            input_path=args.input_path,
+            output_dir=args.output_dir,
+            recursive=args.recursive,
+            num_workers=num_workers,
+            verbose=args.verbose,
+            dry_run=args.dry_run,
+            validate_only=args.validate_only,
+            enabled_handlers=enabled_handlers,
+            quarantine_enabled=quarantine_enabled,
+            quarantine_dir=quarantine_dir,
+            input_root=input_root,
+        )
+
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if self.output_dir:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================================
@@ -279,34 +312,7 @@ For more information, see: https://github.com/fonttools/fonttools
 
     args = parser.parse_args()
 
-    # Validate handler selection
-    enabled_handlers = _parse_handler_selection(args)
-
-    # Determine paths
-    input_root = args.input_path if args.input_path.is_dir() else args.input_path.parent
-    quarantine_enabled = not args.no_quarantine
-    quarantine_dir = input_root / "_quarantine" if quarantine_enabled else None
-
-    # Determine workers
-    num_workers = mp.cpu_count() if args.jobs == 0 else args.jobs
-
-    # Create output directory if needed
-    if args.output_dir:
-        args.output_dir.mkdir(parents=True, exist_ok=True)
-
-    return ProcessingConfig(
-        input_path=args.input_path,
-        output_dir=args.output_dir,
-        recursive=args.recursive,
-        num_workers=num_workers,
-        verbose=args.verbose,
-        dry_run=args.dry_run,
-        validate_only=args.validate_only,
-        enabled_handlers=enabled_handlers,
-        quarantine_enabled=quarantine_enabled,
-        quarantine_dir=quarantine_dir,
-        input_root=input_root,
-    )
+    return ProcessingConfig.from_args(args)
 
 
 # ============================================================================
@@ -509,26 +515,14 @@ def _process_sequential(config: ProcessingConfig, font_paths: list[Path]) -> lis
 
         result_dict = result.to_dict()  # Convert for display and storage
         results.append(result_dict)
-        _display_result(result_dict, font_path)
+        _display_result(result_dict)
 
     return results
 
 
 def _process_parallel(config: ProcessingConfig, font_paths: list[Path]) -> list[Dict]:
     """Process fonts in parallel."""
-    work_items = [
-        (
-            font_path,
-            config.output_dir,
-            config.verbose,
-            config.enabled_handlers,
-            config.validate_only,
-            config.quarantine_dir,
-            config.input_root,
-            config.quarantine_enabled,
-        )
-        for font_path in font_paths
-    ]
+    work_items = [(font_path, config) for font_path in font_paths]
 
     results = []
 
@@ -549,7 +543,7 @@ def _process_parallel(config: ProcessingConfig, font_paths: list[Path]) -> list[
                     f"File {completed} of {len(font_paths)} |"
                 ).add_file(str(font_path), filename_only=True).emit(console)
 
-                _display_result(result, font_path)
+                _display_result(result)
             except Exception as e:
                 error_msg = f"{str(font_path)}: {type(e).__name__}: {str(e)}"
                 if config.verbose:
