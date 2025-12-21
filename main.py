@@ -446,7 +446,7 @@ def _display_handler_list(config: ProcessingConfig):
     ).emit(console)
 
 
-def _display_result(result: Dict, font_path: Path):
+def _display_result(result: Dict):
     """Display result for a single font."""
     if result["success"]:
         # Show NO CHANGE message for unchanged handlers
@@ -469,14 +469,14 @@ def _display_result(result: Dict, font_path: Path):
         # Show quarantine status if file was quarantined
         if result.get("quarantined"):
             cs.StatusIndicator("error").add_file(
-                str(font_path), filename_only=True
+                result["file"], filename_only=True
             ).with_explanation(
                 f"Quarantined: {result.get('quarantine_path', 'unknown')}; "
                 + "; ".join(result["errors"])
             ).emit(console)
         else:
             cs.StatusIndicator("error").add_file(
-                str(font_path), filename_only=True
+                result["file"], filename_only=True
             ).with_explanation("; ".join(result["errors"])).emit(console)
 
 
