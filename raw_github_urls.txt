@@ -1,0 +1,46 @@
+# Root directory
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/README.md
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/__init__.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/main.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/requirements.txt
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/test_imports.py
+
+# support/
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/__init__.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/bitfield.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/constants.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/corruption_detection.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/data_models.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/decorators.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/font_fixer.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/name_table_utils.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/style_analyzer.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/utilities.py
+
+# support/handlers/
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/handlers/__init__.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/handlers/base_handler.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/handlers/glyph_handler.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/handlers/kern_handler.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/handlers/name_handler.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/handlers/os2_handler.py
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/support/handlers/style_handler.py
+
+# FontCore/
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/CoreDemoTool.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/README.md
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/__init__.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_console_styles.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_error_handling.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_file_collector.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_filename_parts_parser.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_font_sorter.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_font_style_dictionaries.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_logging_config.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_name_policies.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_nameid_replacer_base.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_namerecord_matcher.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_string_utils.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_ttx_table_io.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/core_variable_font_detection.py
+https://raw.githubusercontent.com/andrewsipe/FontCore/main/requirements.txt
