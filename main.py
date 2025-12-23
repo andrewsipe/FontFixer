@@ -400,8 +400,8 @@ def display_preflight_info(config: ProcessingConfig, font_paths: list[Path]):
 
     if config.dry_run:
         cs.emit("")
-        cs.StatusIndicator("preview").add_message(
-            "DRY RUN MODE: No changes will be made"
+        cs.StatusIndicator("info", dry_run=True).add_message(
+            "No changes will be made"
         ).emit(console)
         sys.exit(0)
 
