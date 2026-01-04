@@ -1,4 +1,6 @@
 # Root directory
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/CHANGELOG.md
+https://raw.githubusercontent.com/andrewsipe/FontFixer/main/FontCore
 https://raw.githubusercontent.com/andrewsipe/FontFixer/main/README.md
 https://raw.githubusercontent.com/andrewsipe/FontFixer/main/__init__.py
 https://raw.githubusercontent.com/andrewsipe/FontFixer/main/main.py
