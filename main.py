@@ -11,25 +11,40 @@ import sys
 import argparse
 import multiprocessing as mp
 import traceback
+from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Tuple, Dict
-from dataclasses import dataclass
+
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Constants
+DEFAULT_VERSION = "1.0.0"
+TOP_FIXES_TO_DISPLAY = 5
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+EXIT_NO_FONTS_FOUND = 1
 
 try:
     import fontTools.ttLib  # noqa: F401
 except ImportError:
     print("Error: fonttools library not found.")
     print("Install with: pip install fonttools")
-    sys.exit(1)
+    sys.exit(EXIT_FAILURE)
 
 # Add project root to path for FontCore imports (works for root and subdirectory scripts)
 # ruff: noqa: E402
-_project_root = Path(__file__).parent
-while (
-    not (_project_root / "FontCore").exists() and _project_root.parent != _project_root
-):
-    _project_root = _project_root.parent
+
+
+def _find_project_root() -> Path:
+    """Locate project root by walking up until FontCore is found."""
+    root = Path(__file__).resolve().parent
+    while not (root / "FontCore").exists() and root.parent != root:
+        root = root.parent
+    return root
+
+
+_project_root = _find_project_root()
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
@@ -39,7 +54,7 @@ try:
 except ImportError:
     print("Error: FontCore not found.")
     print("FontCore must be available via symlink or in parent directory.")
-    sys.exit(1)
+    sys.exit(EXIT_FAILURE)
 
 try:
     from rich.markup import escape
@@ -52,41 +67,81 @@ except ImportError:
 # Get the themed console singleton
 console = cs.get_console()
 
-# Import FontFixer modules
-from support.font_fixer import FontFixer
-from support.data_models import (
+# Import FontFixer modules (relative for installed package)
+from FontFixer.support.font_fixer import FontFixer
+from FontFixer.support.data_models import (
     HandlerSpec,
     ALL_HANDLERS,
     _get_handler_spec_by_full_name,
 )
 
-# Import version info
-try:
-    # Try importing from package (if installed)
-    from FontFixer import __version__ as fontfixer_version
-except ImportError:
-    try:
-        # Try importing from local __init__.py
-        import sys
-        from pathlib import Path
 
-        _init_path = Path(__file__).parent / "__init__.py"
-        if _init_path.exists():
-            # Read version directly from __init__.py
-            with open(_init_path) as f:
-                for line in f:
-                    if line.startswith("__version__"):
-                        fontfixer_version = (
-                            line.split("=")[1].strip().strip('"').strip("'")
-                        )
-                        break
-                else:
-                    fontfixer_version = "1.0.0"
+@lru_cache(maxsize=None)
+def _handler_short_name(full_name: str) -> str:
+    """Return short name for a handler full_name; cache for repeated lookups."""
+    spec = _get_handler_spec_by_full_name(full_name)
+    return spec.short_name if spec else full_name
+
+
+def get_version() -> str:
+    """Return package version; use DEFAULT_VERSION if not installed as package."""
+    try:
+        from FontFixer import __version__
+        return __version__
+    except ImportError:
+        return DEFAULT_VERSION
+
+
+fontfixer_version = get_version()
+
+
+# ============================================================================
+# PROCESSING STATISTICS (single-pass aggregation)
+# ============================================================================
+
+
+@dataclass
+class ProcessingStats:
+    """Aggregated statistics from a processing run (computed in one pass)."""
+
+    updated: int = 0
+    unchanged: int = 0
+    failed: int = 0
+    quarantined: int = 0
+    common_fixes: dict[str, int] = field(default_factory=dict)
+    handler_changed_counts: dict[str, int] = field(default_factory=dict)
+    handler_unchanged_counts: dict[str, int] = field(default_factory=dict)
+
+
+def _calculate_statistics(results: list[Dict]) -> ProcessingStats:
+    """Compute all summary statistics in a single pass over results."""
+    stats = ProcessingStats()
+    for r in results:
+        if not r.get("success", False):
+            stats.failed += 1
+            if r.get("quarantined", False):
+                stats.quarantined += 1
+            continue
+        if r.get("was_modified", False):
+            stats.updated += 1
+            for handler, changes in r.get("changes", {}).items():
+                for prop, change in changes.items():
+                    if change.get("changed"):
+                        key = f"{_handler_short_name(handler)}.{prop}"
+                        stats.common_fixes[key] = stats.common_fixes.get(key, 0) + 1
         else:
-            fontfixer_version = "1.0.0"
-    except Exception:
-        # Final fallback
-        fontfixer_version = "1.0.0"
+            stats.unchanged += 1
+        for handler in r.get("handlers_changed", []):
+            name = _handler_short_name(handler)
+            stats.handler_changed_counts[name] = (
+                stats.handler_changed_counts.get(name, 0) + 1
+            )
+        for handler in r.get("handlers_unchanged", []):
+            name = _handler_short_name(handler)
+            stats.handler_unchanged_counts[name] = (
+                stats.handler_unchanged_counts.get(name, 0) + 1
+            )
+    return stats
 
 
 # ============================================================================
@@ -153,7 +208,7 @@ def _parse_handler_selection(args) -> Optional[list[str]]:
         cs.StatusIndicator("error").add_message(
             "--handlers and --skip-handlers cannot be used together"
         ).emit(console)
-        sys.exit(1)
+        sys.exit(EXIT_FAILURE)
 
     if args.handlers:
         return _parse_enabled_handlers(args.handlers)
@@ -174,7 +229,7 @@ def _parse_enabled_handlers(handlers_str: str) -> list[str]:
             f"Invalid handler(s): {', '.join(invalid)}. "
             f"Available: {', '.join(HandlerSpec.all_short_names())}"
         ).emit(console)
-        sys.exit(1)
+        sys.exit(EXIT_FAILURE)
 
     return [HandlerSpec.get(h).full_name for h in handler_list]
 
@@ -189,7 +244,7 @@ def _parse_skipped_handlers(handlers_str: str) -> list[str]:
             f"Invalid handler(s): {', '.join(invalid)}. "
             f"Available: {', '.join(HandlerSpec.all_short_names())}"
         ).emit(console)
-        sys.exit(1)
+        sys.exit(EXIT_FAILURE)
 
     all_handlers_set = set(ALL_HANDLERS)
     skip_handlers_set = {HandlerSpec.get(h).full_name for h in skip_list}
@@ -199,7 +254,7 @@ def _parse_skipped_handlers(handlers_str: str) -> list[str]:
         cs.StatusIndicator("error").add_message("Cannot skip all handlers").emit(
             console
         )
-        sys.exit(1)
+        sys.exit(EXIT_FAILURE)
 
     return enabled
 
@@ -361,7 +416,7 @@ def discover_and_validate_fonts(config: ProcessingConfig) -> list[Path]:
 
     if not font_paths:
         cs.StatusIndicator("error").add_message("No font files found.").emit(console)
-        sys.exit(0)
+        sys.exit(EXIT_NO_FONTS_FOUND)
 
     return font_paths
 
@@ -376,9 +431,9 @@ def display_preflight_info(config: ProcessingConfig, font_paths: list[Path]):
         handler_display = HandlerSpec.all_short_names()
     else:
         handler_display = [
-            spec.short_name
+            _handler_short_name(h)
             for h in config.enabled_handlers
-            if (spec := _get_handler_spec_by_full_name(h)) is not None
+            if _get_handler_spec_by_full_name(h) is not None
         ]
 
     # Build operations list with handler descriptions
@@ -403,7 +458,7 @@ def display_preflight_info(config: ProcessingConfig, font_paths: list[Path]):
         cs.StatusIndicator("info", dry_run=True).add_message(
             "No changes will be made"
         ).emit(console)
-        sys.exit(0)
+        sys.exit(EXIT_SUCCESS)
 
 
 def main():
@@ -434,9 +489,9 @@ def _display_handler_list(config: ProcessingConfig):
     """Display which handlers will run."""
     if config.enabled_handlers:
         handler_display = [
-            spec.short_name
+            _handler_short_name(h)
             for h in config.enabled_handlers
-            if (spec := _get_handler_spec_by_full_name(h)) is not None
+            if _get_handler_spec_by_full_name(h) is not None
         ]
     else:
         handler_display = HandlerSpec.all_short_names()
@@ -452,9 +507,9 @@ def _display_result(result: Dict):
         # Show NO CHANGE message for unchanged handlers
         if result.get("handlers_unchanged"):
             unchanged_display = [
-                spec.short_name
+                _handler_short_name(h)
                 for h in result["handlers_unchanged"]
-                if (spec := _get_handler_spec_by_full_name(h)) is not None
+                if _get_handler_spec_by_full_name(h) is not None
             ]
             cs.StatusIndicator("unchanged").add_message(
                 f"Already compliant: {', '.join(unchanged_display)}"
@@ -564,128 +619,91 @@ def _process_parallel(config: ProcessingConfig, font_paths: list[Path]) -> list[
 
 def display_summary(config: ProcessingConfig, results: list[Dict]):
     """Display processing summary."""
-    successful = sum(1 for r in results if r["success"])
-    failed = len(results) - successful
-    unchanged = sum(
-        1 for r in results if r["success"] and not r.get("was_modified", False)
-    )
-    updated = sum(1 for r in results if r["success"] and r.get("was_modified", False))
-    quarantined = sum(1 for r in results if r.get("quarantined", False))
+    stats = _calculate_statistics(results)
 
     cs.fmt_processing_summary(
         dry_run=False,
-        updated=updated,
-        unchanged=unchanged,
-        errors=failed,
+        updated=stats.updated,
+        unchanged=stats.unchanged,
+        errors=stats.failed,
         console=console,
     )
 
     # Show quarantined count if any files were quarantined
-    if quarantined > 0 and config.quarantine_dir:
+    if stats.quarantined > 0 and config.quarantine_dir:
         cs.emit("", console=console)
         cs.StatusIndicator("info").add_message(
-            f"Quarantined {cs.fmt_count(quarantined)} corrupted font file(s) to: {config.quarantine_dir}"
+            f"Quarantined {cs.fmt_count(stats.quarantined)} corrupted font file(s) to: {config.quarantine_dir}"
         ).emit(console)
 
     # Show most common fixes applied
-    if updated > 0 and results:
-        _display_common_fixes(results)
+    if stats.updated > 0 and stats.common_fixes:
+        _display_common_fixes(stats.common_fixes)
 
     # Show handler-level statistics
-    if results:
-        _display_handler_statistics(results)
+    if stats.handler_changed_counts or stats.handler_unchanged_counts:
+        _display_handler_statistics(stats.handler_changed_counts, stats.handler_unchanged_counts)
 
     # Show failed files if any
-    if failed > 0:
-        _display_failed_files(results)
+    if stats.failed > 0:
+        _display_failed_files(results, stats.failed)
 
 
-def _display_common_fixes(results: list[Dict]):
-    """Display most common fixes applied."""
-    common_fixes = {}
-    for result in results:
-        # Only count fixes from successfully processed and saved files
-        # This ensures consistency with the "updated" count
-        if not result.get("success", False) or not result.get("was_modified", False):
-            continue
-
-        for handler, changes in result.get("changes", {}).items():
-            for prop in changes.keys():
-                if changes[prop].get("changed"):
-                    spec = _get_handler_spec_by_full_name(handler)
-                    handler_short = spec.short_name if spec else handler
-                    key = f"{handler_short}.{prop}"
-                    common_fixes[key] = common_fixes.get(key, 0) + 1
-
-    if common_fixes:
-        top_fixes = sorted(common_fixes.items(), key=lambda x: x[1], reverse=True)[:5]
-        cs.emit("", console=console)
-        cs.StatusIndicator("info").add_message("Most common fixes applied:").emit(
-            console
-        )
-        for fix, count in top_fixes:
-            cs.emit(f"  · {fix}: {count} file(s)", console=console)
+def _display_common_fixes(common_fixes: dict[str, int]):
+    """Display most common fixes applied (from precomputed stats)."""
+    if not common_fixes:
+        return
+    top_fixes = sorted(
+        common_fixes.items(), key=lambda x: x[1], reverse=True
+    )[:TOP_FIXES_TO_DISPLAY]
+    cs.emit("", console=console)
+    cs.StatusIndicator("info").add_message("Most common fixes applied:").emit(
+        console
+    )
+    for fix, count in top_fixes:
+        cs.emit(f"  · {fix}: {count} file(s)", console=console)
 
 
-def _display_handler_statistics(results: list[Dict]):
-    """Display handler-level statistics."""
-    handler_changed_counts = {}
-    handler_unchanged_counts = {}
+def _display_handler_statistics(
+    handler_changed_counts: dict[str, int],
+    handler_unchanged_counts: dict[str, int],
+):
+    """Display handler-level statistics (from precomputed counts)."""
+    if not handler_changed_counts and not handler_unchanged_counts:
+        return
+    cs.emit("")
 
-    for result in results:
-        # Only count handlers from successfully processed files
-        # This ensures statistics match the "updated" count which only includes successful saves
-        if not result.get("success", False):
-            continue
+    all_handlers = set(handler_changed_counts.keys()) | set(
+        handler_unchanged_counts.keys()
+    )
+    total_updates = sum(handler_changed_counts.values())
+    total_stable = sum(handler_unchanged_counts.values())
 
-        for handler in result.get("handlers_changed", []):
-            spec = _get_handler_spec_by_full_name(handler)
-            handler_display = spec.short_name if spec else handler
-            handler_changed_counts[handler_display] = (
-                handler_changed_counts.get(handler_display, 0) + 1
-            )
+    indicator = cs.StatusIndicator("success").add_message("Handler Statistics")
+    indicator.add_item(
+        f"Handlers evaluated: {cs.fmt_count(len(all_handlers))} | "
+        f"Made changes: {cs.fmt_count(total_updates)} | "
+        f"No changes: {cs.fmt_count(total_stable)}"
+    )
 
-        for handler in result.get("handlers_unchanged", []):
-            spec = _get_handler_spec_by_full_name(handler)
-            handler_display = spec.short_name if spec else handler
-            handler_unchanged_counts[handler_display] = (
-                handler_unchanged_counts.get(handler_display, 0) + 1
-            )
+    for handler_name in sorted(all_handlers):
+        changed = handler_changed_counts.get(handler_name, 0)
+        unchanged = handler_unchanged_counts.get(handler_name, 0)
 
-    if handler_changed_counts or handler_unchanged_counts:
-        cs.emit("")
+        if changed and unchanged:
+            detail = f"{handler_name}: {cs.fmt_count(changed)} updated, {cs.fmt_count(unchanged)} unchanged"
+        elif changed:
+            detail = f"{handler_name}: {cs.fmt_count(changed)} updated"
+        else:
+            detail = f"{handler_name}: {cs.fmt_count(unchanged)} unchanged"
 
-        all_handlers = set(handler_changed_counts.keys()) | set(
-            handler_unchanged_counts.keys()
-        )
-        total_updates = sum(handler_changed_counts.values())
-        total_stable = sum(handler_unchanged_counts.values())
+        indicator.add_item(detail, indent_level=2)
 
-        indicator = cs.StatusIndicator("success").add_message("Handler Statistics")
-        indicator.add_item(
-            f"Handlers evaluated: {cs.fmt_count(len(all_handlers))} | "
-            f"Made changes: {cs.fmt_count(total_updates)} | "
-            f"No changes: {cs.fmt_count(total_stable)}"
-        )
-
-        for handler_name in sorted(all_handlers):
-            changed = handler_changed_counts.get(handler_name, 0)
-            unchanged = handler_unchanged_counts.get(handler_name, 0)
-
-            if changed and unchanged:
-                detail = f"{handler_name}: {cs.fmt_count(changed)} updated, {cs.fmt_count(unchanged)} unchanged"
-            elif changed:
-                detail = f"{handler_name}: {cs.fmt_count(changed)} updated"
-            else:
-                detail = f"{handler_name}: {cs.fmt_count(unchanged)} unchanged"
-
-            indicator.add_item(detail, indent_level=2)
-
-        indicator.emit(console)
+    indicator.emit(console)
 
 
-def _display_failed_files(results: list[Dict]):
-    """Display list of failed files."""
+def _display_failed_files(results: list[Dict], failed_count: int):
+    """Display list of failed files and exit with appropriate code."""
     cs.emit("")
     cs.StatusIndicator("error").add_message("Failed files:").emit(console)
     for result in results:
@@ -694,10 +712,8 @@ def _display_failed_files(results: list[Dict]):
                 str(result["file"]), filename_only=False
             ).with_explanation("; ".join(result["errors"])).emit(console)
 
-    # Exit with appropriate code
-    failed = sum(1 for r in results if not r["success"])
     cs.emit("")
-    sys.exit(0 if failed == 0 else 1)
+    sys.exit(EXIT_SUCCESS if failed_count == 0 else EXIT_FAILURE)
 
 
 if __name__ == "__main__":

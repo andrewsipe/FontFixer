@@ -19,11 +19,29 @@ FontFixer is a modular, handler-based font fixing tool designed to replace seque
 
 ## Installation
 
+### Install as a terminal command (recommended)
+
+From the `FontFixer` directory:
+
+```bash
+pip install -e .
+```
+
+Then run from anywhere:
+
+```bash
+fontfixer fonts/
+# or
+FontFixer fonts/
+```
+
+If the installer says the script is not on PATH, add Python’s user bin (e.g. `~/Library/Python/3.14/bin` on macOS) to your PATH, or use the full path to `fontfixer` / `FontFixer`.
+
+### Dependencies only (run via `python main.py`)
+
 ```bash
 pip install -r requirements.txt
 ```
-
-### Dependencies
 
 - `fonttools>=4.0.0` - Font manipulation library
 - `rich>=13.0.0` - Terminal formatting (optional, for enhanced output)
@@ -33,31 +51,32 @@ pip install -r requirements.txt
 ### Basic Usage
 
 ```bash
-# Process all fonts in a directory
-python main.py fonts/
+# Process all fonts in a directory (use fontfixer/FontFixer if installed, or python main.py)
+fontfixer fonts/
+# or: python main.py fonts/
 
 # Process recursively with 8 parallel workers
-python main.py -r -j 8 fonts/
+fontfixer -r -j 8 fonts/
 
 # Save fixed fonts to a different directory
-python main.py -o output/ fonts/
+fontfixer -o output/ fonts/
 ```
 
 ### Handler Selection
 
 ```bash
 # Only run specific handlers
-python main.py --handlers os2,style fonts/
+fontfixer --handlers os2,style fonts/
 
 # Skip specific handlers
-python main.py --skip-handlers name fonts/
+fontfixer --skip-handlers name fonts/
 ```
 
 ### Validation Mode
 
 ```bash
 # Preview what would be changed without modifying files
-python main.py --validate-only -v fonts/MyFont.ttf
+fontfixer --validate-only -v fonts/MyFont.ttf
 ```
 
 ## Available Handlers
