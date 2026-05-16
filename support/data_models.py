@@ -120,7 +120,11 @@ class FontFixResult:
         self.add_error(msg, include_traceback)
 
     def mark_handler_run(self, handler_name: str, changed: bool):
-        """Record handler execution result."""
+        """Record handler execution result.
+
+        Appends to ``handlers_run`` and routes the name to ``handlers_changed`` or
+        ``handlers_unchanged``. Call this only; do not append to ``handlers_run`` separately.
+        """
         self.handlers_run.append(handler_name)
         if changed:
             self.handlers_changed.append(handler_name)

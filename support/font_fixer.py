@@ -232,7 +232,6 @@ class FontFixer:
             for handler in handlers:
                 try:
                     handler_name = handler.get_table_name()
-                    result.handlers_run.append(handler_name)
 
                     # Validate
                     handler_validations = handler.validate()

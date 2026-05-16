@@ -375,36 +375,20 @@ For more information, see: https://github.com/fonttools/fonttools
 # ============================================================================
 
 
-def process_font_wrapper(
-    args: Tuple[
-        Path,
-        Optional[Path],
-        bool,
-        Optional[list],
-        bool,
-        Optional[Path],
-        Optional[Path],
-        bool,
-    ],
-) -> Dict:
-    """Wrapper for multiprocessing."""
-    (
-        font_path,
-        output_dir,
-        verbose,
-        enabled_handlers,
-        validate_only,
-        quarantine_dir,
-        input_root,
-        quarantine_enabled,
-    ) = args
+def process_font_wrapper(args: Tuple[Path, ProcessingConfig]) -> Dict:
+    """Wrapper for multiprocessing (must accept a single pickleable argument)."""
+    font_path, config = args
     fixer = FontFixer(
-        verbose=verbose,
-        enabled_handlers=enabled_handlers,
-        quarantine_enabled=quarantine_enabled,
+        verbose=config.verbose,
+        enabled_handlers=config.enabled_handlers,
+        quarantine_enabled=config.quarantine_enabled,
     )
     result = fixer.fix_font(
-        font_path, output_dir, validate_only, quarantine_dir, input_root
+        font_path,
+        config.output_dir,
+        config.validate_only,
+        config.quarantine_dir,
+        config.input_root,
     )
     return result.to_dict()  # Convert to dict for multiprocessing compatibility
 
