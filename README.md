@@ -1,6 +1,6 @@
 # FontFixer
 
-**Version 1.1.0**
+**Version 1.1.1**
 
 A simple OpenType tidy-up tool: OS/2, style flags, glyphs, and legacy kern — one pass per font.
 

@@ -19,7 +19,7 @@ from typing import Optional, Tuple, Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Constants
-DEFAULT_VERSION = "1.1.0"
+DEFAULT_VERSION = "1.1.1"
 TOP_FIXES_TO_DISPLAY = 5
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -203,14 +203,13 @@ HANDLER_BLURBS = {
 
 DESCRIPTION = """\
 Tidy OpenType fonts in a single pass (OS/2, style flags, glyphs, kern).
-
-WARNING: by default changes are written over the original files (no backup).
-Use -o DIR to keep originals, or --validate-only / -n to look first.
 """
 
 
 def build_parser(version: str, handlers: dict[str, str]) -> argparse.ArgumentParser:
     """Build the CLI argument parser (help text is the primary UX surface)."""
+    from FontFixer.support.rich_help import RichHelp
+
     names = ",".join(handlers)
     # Match argparse option help: 2-space indent + ~22-char left column.
     help_col = 22
@@ -234,9 +233,17 @@ docs: https://github.com/andrewsipe/FontFixer
 
     p = argparse.ArgumentParser(
         prog="fontfixer",
-        description=DESCRIPTION,
+        description=DESCRIPTION.strip(),
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
+    p.add_argument(
+        "-h",
+        "--help",
+        action=RichHelp,
+        console=console,
+        help="show this help message and exit",
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {version}")
 
