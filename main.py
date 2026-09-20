@@ -19,7 +19,7 @@ from typing import Optional, Tuple, Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Constants
-DEFAULT_VERSION = "1.0.0"
+DEFAULT_VERSION = "1.0.1"
 TOP_FIXES_TO_DISPLAY = 5
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -32,19 +32,9 @@ except ImportError:
     print("Install with: pip install fonttools")
     sys.exit(EXIT_FAILURE)
 
-# Add project root to path for FontCore imports (works for root and subdirectory scripts)
 # ruff: noqa: E402
-
-
-def _find_project_root() -> Path:
-    """Locate project root by walking up until FontCore is found."""
-    root = Path(__file__).resolve().parent
-    while not (root / "FontCore").exists() and root.parent != root:
-        root = root.parent
-    return root
-
-
-_project_root = _find_project_root()
+# Checkout fallback: ensure project root is on path when running `python main.py`
+_project_root = Path(__file__).resolve().parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
@@ -53,7 +43,8 @@ try:
     from FontCore.core_file_collector import collect_font_files
 except ImportError:
     print("Error: FontCore not found.")
-    print("FontCore must be available via symlink or in parent directory.")
+    print("Install FontFixer with: pip install .")
+    print("Or run from a checkout that includes the vendored FontCore/ package.")
     sys.exit(EXIT_FAILURE)
 
 try:
@@ -262,7 +253,10 @@ def _parse_skipped_handlers(handlers_str: str) -> list[str]:
 def parse_and_validate_arguments() -> ProcessingConfig:
     """Parse command-line arguments and validate configuration."""
     parser = argparse.ArgumentParser(
-        description=f"Apply all font fixes in a single pass using only fonttools (v{fontfixer_version}).",
+        prog="fontfixer",
+        description=(
+            f"Apply all font fixes in a single pass (v{fontfixer_version})."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 EXAMPLES:
@@ -282,7 +276,7 @@ EXAMPLES:
     %(prog)s --skip-handlers name fonts/
 
   Preview what would be changed without modifying files:
-    %(prog)s --validate-only -V fonts/MyFont.ttf
+    %(prog)s --validate-only -v fonts/MyFont.ttf
 
 AVAILABLE HANDLERS:
   Handler      Description
@@ -301,11 +295,14 @@ AVAILABLE HANDLERS:
   name         Name table cleanup: Windows English records only,
                removal of problematic nameIDs (13,14,18,19,200-203,55555)
 
-DEPENDENCIES:
-  This tool requires only fonttools:
-    pip install fonttools
+INSTALLATION:
+  pip install "git+https://github.com/andrewsipe/FontFixer.git"
+  # or: pip install .
 
-For more information, see: https://github.com/fonttools/fonttools
+RUNTIME DEPENDENCIES:
+  fonttools, rich (installed automatically with the package)
+
+For more information, see: https://github.com/andrewsipe/FontFixer
         """,
     )
 

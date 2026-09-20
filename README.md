@@ -1,6 +1,6 @@
 # FontFixer
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 A high-performance font validation and correction tool that applies comprehensive OpenType font fixes in a single pass.
 
@@ -19,41 +19,56 @@ FontFixer is a modular, handler-based font fixing tool designed to replace seque
 
 ## Installation
 
-### Install as a terminal command (recommended)
+The canonical command is **`fontfixer`**. On macOS, a second `FontFixer` script is not shipped (case-insensitive filesystem collision); use an optional alias if you want the capital-F name.
 
-From the `FontFixer` directory:
+### From GitHub (recommended)
 
 ```bash
+pip install "git+https://github.com/andrewsipe/FontFixer.git"
+```
+
+Or install from a zip download:
+
+```bash
+pip install https://github.com/andrewsipe/FontFixer/archive/refs/heads/main.zip
+```
+
+### From a clone / download
+
+```bash
+cd FontFixer
+pip install .
+# or editable during development:
 pip install -e .
 ```
 
-Then run from anywhere:
+Then run:
 
 ```bash
 fontfixer fonts/
-# or
-FontFixer fonts/
 ```
 
-If the installer says the script is not on PATH, add Python’s user bin (e.g. `~/Library/Python/3.14/bin` on macOS) to your PATH, or use the full path to `fontfixer` / `FontFixer`.
-
-### Dependencies only (run via `python main.py`)
+Optional alias:
 
 ```bash
-pip install -r requirements.txt
+alias FontFixer=fontfixer
 ```
 
-- `fonttools>=4.0.0` - Font manipulation library
-- `rich>=13.0.0` - Terminal formatting (optional, for enhanced output)
+If the installer says the script is not on PATH, add Python’s user bin (e.g. `~/Library/Python/3.x/bin` on macOS) to your PATH.
+
+### Dependencies
+
+Installed automatically with the package:
+
+- `fonttools>=4.0.0` — font manipulation
+- `rich>=13.0.0` — terminal formatting
 
 ## Usage
 
 ### Basic Usage
 
 ```bash
-# Process all fonts in a directory (use fontfixer/FontFixer if installed, or python main.py)
 fontfixer fonts/
-# or: python main.py fonts/
 
 # Process recursively with 8 parallel workers
 fontfixer -r -j 8 fonts/
@@ -101,36 +116,31 @@ The handlers execute in a specific order that is critical for correct functional
 
 ## Architecture
 
-The project is organized into modular components:
-
 ```
 FontFixer/
 ├── main.py                          # CLI entry point
 ├── support/
 │   ├── constants.py                 # OpenType constants
 │   ├── data_models.py               # FontFixResult, HandlerSpec
-│   ├── decorators.py                 # @conditional_fix decorator
-│   ├── utilities.py                  # Utility functions
-│   ├── bitfield.py                   # Bitfield specifications
-│   ├── name_table_utils.py           # Name table manipulation
-│   ├── style_analyzer.py             # Font style analysis
-│   ├── corruption_detection.py       # Corruption detection and quarantine
+│   ├── decorators.py                # @conditional_fix decorator
+│   ├── utilities.py                 # Utility functions
+│   ├── bitfield.py                  # Bitfield specifications
+│   ├── name_table_utils.py          # Name table manipulation
+│   ├── style_analyzer.py            # Font style analysis
+│   ├── corruption_detection.py      # Corruption detection and quarantine
 │   ├── handlers/
-│   │   ├── base_handler.py           # TableHandler ABC, ChangeBuilder
-│   │   ├── os2_handler.py            # OS2TableHandler
-│   │   ├── style_handler.py          # StyleConsistencyHandler
-│   │   ├── glyph_handler.py          # GlyphHandler
-│   │   ├── kern_handler.py           # KernHandler
-│   │   └── name_handler.py            # NameTableHandler
-│   └── font_fixer.py                 # FontFixer orchestrator
-└── FontCore/                         # Symlink to shared FontCore
+│   │   ├── base_handler.py          # TableHandler ABC, ChangeBuilder
+│   │   ├── os2_handler.py           # OS2TableHandler
+│   │   ├── style_handler.py         # StyleConsistencyHandler
+│   │   ├── glyph_handler.py         # GlyphHandler
+│   │   ├── kern_handler.py          # KernHandler
+│   │   └── name_handler.py           # NameTableHandler
+│   └── font_fixer.py                # FontFixer orchestrator
+└── FontCore/                        # Vendored slim FontCore subset
 ```
 
-## Original Script
-
-The original script (`FontFileTools/Tools_FontFixer.py`) has been deprecated in favor of this modular version. It is kept for reference only.
+See `FontCore/VENDOR.md` for which modules are included and how to refresh them.
 
 ## License
 
 See the main project license.
-

@@ -5,6 +5,17 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-20
+
+### Added
+- Vendored slim `FontCore/` package (console + file collector only) for standalone installs
+- GitHub / local `pip install` packaging without FontCore submodule
+
+### Changed
+- Console script is **`fontfixer` only** (`FontFixer` is an optional user alias)
+- `--help` epilog: fixed `-v` example, install notes, FontFixer repo link
+- Dropped FontCore symlink / `.gitmodules` dependency
+
 ## [1.0.0] - 2024-12-XX
 
 ### Added
@@ -45,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `corruption_detection.py`: Corruption detection and quarantine
   - `font_fixer.py`: FontFixer orchestrator
   - `handlers/`: Handler implementations (5 handlers)
-- **FontCore dependency**: Symlink to shared FontCore module
+- **FontCore dependency**: Vendored slim subset under `FontCore/` (standalone installs)
 - **Single-pass processing**: Opens each font once, applies all fixes, writes once
 - **Parallel processing**: Multi-core support via ProcessPoolExecutor
 

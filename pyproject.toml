@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fontfixer"
-version = "1.0.0"
+version = "1.0.1"
 description = "Modular font validation and correction tool (OpenType fixes in a single pass)"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -13,15 +13,16 @@ dependencies = [
     "rich>=13.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/andrewsipe/FontFixer"
+Repository = "https://github.com/andrewsipe/FontFixer"
+
 [project.scripts]
 fontfixer = "FontFixer.main:main"
-FontFixer = "FontFixer.main:main"
 
 [tool.setuptools]
-packages = ["FontFixer", "FontFixer.support", "FontFixer.support.handlers"]
+packages = ["FontFixer", "FontFixer.support", "FontFixer.support.handlers", "FontCore"]
 
 [tool.setuptools.package-dir]
 "FontFixer" = "."
-
-[tool.setuptools.package-data]
-"FontFixer" = ["support/**/*.py", "support/handlers/**/*.py"]
+"FontCore" = "FontCore"
