@@ -19,7 +19,7 @@ from typing import Optional, Tuple, Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Constants
-DEFAULT_VERSION = "1.0.1"
+DEFAULT_VERSION = "1.0.2"
 TOP_FIXES_TO_DISPLAY = 5
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -184,7 +184,8 @@ class ProcessingConfig:
 
     def __post_init__(self):
         """Validate configuration after initialization."""
-        if self.output_dir:
+        # Do not create -o DIR during dry-run or validate-only (no writes).
+        if self.output_dir and not self.dry_run and not self.validate_only:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -192,15 +193,119 @@ class ProcessingConfig:
 # ARGUMENT PARSING
 # ============================================================================
 
+# One-line blurbs for --help. Long descriptions stay on HandlerSpec for preflight.
+HANDLER_BLURBS = {
+    "os2": "OS/2 version, embedding permissions, monospace flag, USE_TYPO_METRICS, WWS",
+    "style": "Make italic/bold data agree across post, hhea, OS/2, head (run after os2)",
+    "glyph": ".notdef structure; add nbsp (U+00A0) with the same width as space",
+    "kern": "Remove legacy 'kern' table when a GPOS table exists",
+    "name": (
+        "Windows English name records only; drop license description/URL "
+        "(nameIDs 13/14), preferred family/subfamily (18/19), and IDs 200-203, 55555"
+    ),
+}
+
+DESCRIPTION = """\
+Validate and repair OpenType font metadata in a single pass per font.
+
+WARNING: by default fixes are written over the original files (no backup).
+Use -o DIR to keep originals, or --validate-only / -n to look first.
+"""
+
+
+def build_parser(version: str, handlers: dict[str, str]) -> argparse.ArgumentParser:
+    """Build the CLI argument parser (help text is the primary UX surface)."""
+    names = ",".join(handlers)
+    width = max(len(n) for n in handlers)
+    handler_table = "\n".join(f"  {n:<{width}}  {d}" for n, d in handlers.items())
+
+    epilog = f"""\
+handlers (run in this order):
+{handler_table}
+
+examples:
+  %(prog)s --validate-only -v fonts/     report problems, apply no fixes
+  %(prog)s -o fixed/ fonts/              write fixed copies to fixed/
+  %(prog)s -r -j 0 fonts/                fix a whole tree in place, all CPU cores
+  %(prog)s --handlers os2,style fonts/   only the OS/2 and style fixes
+  %(prog)s --skip-handlers name fonts/   everything except name-table cleanup
+
+exit status: 0 = all fonts OK, 1 = any failure or no fonts found
+
+docs: https://github.com/andrewsipe/FontFixer
+"""
+
+    p = argparse.ArgumentParser(
+        prog="fontfixer",
+        description=DESCRIPTION,
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--version", action="version", version=f"%(prog)s {version}")
+
+    g_in = p.add_argument_group("input")
+    g_in.add_argument("input_path", type=Path, help="font file or directory of fonts")
+    g_in.add_argument(
+        "-r", "--recursive", action="store_true", help="also search subdirectories"
+    )
+
+    g_out = p.add_argument_group("output and safety")
+    g_out.add_argument(
+        "-o",
+        "--output-dir",
+        type=Path,
+        metavar="DIR",
+        help="write fixed fonts to DIR (created if missing) instead of "
+        "overwriting the originals",
+    )
+    g_out.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="open each font and report problems, but apply no fixes",
+    )
+    g_out.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="only list the files and handlers that would be used, then exit "
+        "(fonts are not opened; use --validate-only to inspect them)",
+    )
+    g_out.add_argument(
+        "--no-quarantine",
+        action="store_true",
+        help="leave corrupted fonts in place; by default they are moved to "
+        "<input>/_quarantine/",
+    )
+
+    g_sel = p.add_argument_group(
+        "fix selection", "choose at most one; default is all handlers"
+    ).add_mutually_exclusive_group()
+    g_sel.add_argument(
+        "--handlers",
+        metavar="LIST",
+        help=f"run only these handlers, comma-separated ({names})",
+    )
+    g_sel.add_argument(
+        "--skip-handlers",
+        metavar="LIST",
+        help="run everything except these handlers, comma-separated",
+    )
+
+    g_run = p.add_argument_group("performance and logging")
+    g_run.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="parallel workers (default: 1; 0 = one per CPU core)",
+    )
+    g_run.add_argument("-v", "--verbose", action="store_true", help="verbose output")
+    return p
+
 
 def _parse_handler_selection(args) -> Optional[list[str]]:
-    """Parse --handlers and --skip-handlers arguments."""
-    if args.handlers and args.skip_handlers:
-        cs.StatusIndicator("error").add_message(
-            "--handlers and --skip-handlers cannot be used together"
-        ).emit(console)
-        sys.exit(EXIT_FAILURE)
-
+    """Parse --handlers / --skip-handlers (mutual exclusion enforced by argparse)."""
     if args.handlers:
         return _parse_enabled_handlers(args.handlers)
 
@@ -211,8 +316,8 @@ def _parse_handler_selection(args) -> Optional[list[str]]:
 
 
 def _parse_enabled_handlers(handlers_str: str) -> list[str]:
-    """Parse comma-separated handler list."""
-    handler_list = [h.strip().lower() for h in handlers_str.split(",")]
+    """Parse comma-separated handler list; return full names in ALL_HANDLERS order."""
+    handler_list = [h.strip().lower() for h in handlers_str.split(",") if h.strip()]
     invalid = [h for h in handler_list if h not in HandlerSpec.all_short_names()]
 
     if invalid:
@@ -222,12 +327,14 @@ def _parse_enabled_handlers(handlers_str: str) -> list[str]:
         ).emit(console)
         sys.exit(EXIT_FAILURE)
 
-    return [HandlerSpec.get(h).full_name for h in handler_list]
+    requested = {HandlerSpec.get(h).full_name for h in handler_list}
+    # Preserve canonical execution order (FontFixer also filters HANDLER_CLASSES).
+    return [name for name in ALL_HANDLERS if name in requested]
 
 
 def _parse_skipped_handlers(handlers_str: str) -> list[str]:
-    """Parse comma-separated skip list."""
-    skip_list = [h.strip().lower() for h in handlers_str.split(",")]
+    """Parse comma-separated skip list; return remaining handlers in canonical order."""
+    skip_list = [h.strip().lower() for h in handlers_str.split(",") if h.strip()]
     invalid = [h for h in skip_list if h not in HandlerSpec.all_short_names()]
 
     if invalid:
@@ -237,9 +344,8 @@ def _parse_skipped_handlers(handlers_str: str) -> list[str]:
         ).emit(console)
         sys.exit(EXIT_FAILURE)
 
-    all_handlers_set = set(ALL_HANDLERS)
     skip_handlers_set = {HandlerSpec.get(h).full_name for h in skip_list}
-    enabled = list(all_handlers_set - skip_handlers_set)
+    enabled = [name for name in ALL_HANDLERS if name not in skip_handlers_set]
 
     if not enabled:
         cs.StatusIndicator("error").add_message("Cannot skip all handlers").emit(
@@ -252,118 +358,14 @@ def _parse_skipped_handlers(handlers_str: str) -> list[str]:
 
 def parse_and_validate_arguments() -> ProcessingConfig:
     """Parse command-line arguments and validate configuration."""
-    parser = argparse.ArgumentParser(
-        prog="fontfixer",
-        description=(
-            f"Apply all font fixes in a single pass (v{fontfixer_version})."
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-EXAMPLES:
-  Process all fonts in a directory (non-recursive):
-    %(prog)s fonts/
-
-  Process recursively with 8 parallel workers:
-    %(prog)s -r -j 8 fonts/
-
-  Save fixed fonts to a different directory:
-    %(prog)s -o output/ fonts/
-
-  Only run specific handlers (comma-separated):
-    %(prog)s --handlers os2,style fonts/
-
-  Skip specific handlers:
-    %(prog)s --skip-handlers name fonts/
-
-  Preview what would be changed without modifying files:
-    %(prog)s --validate-only -v fonts/MyFont.ttf
-
-AVAILABLE HANDLERS:
-  Handler      Description
-  -----------  ----------------------------------------------------
-  os2          OS/2 table version, embedding permissions, monospace
-               detection, USE_TYPO_METRICS and WWS flags
-
-  style        Style consistency across post, hhea, OS/2, and head
-               tables (italic angle, caret slope, fsSelection, macStyle)
-
-  glyph        Glyph-level fixes: .notdef structure, nbsp (U+00A0)
-               presence and width matching space character
-
-  kern         Legacy kern table removal when modern GPOS table exists
-
-  name         Name table cleanup: Windows English records only,
-               removal of problematic nameIDs (13,14,18,19,200-203,55555)
-
-INSTALLATION:
-  pip install "git+https://github.com/andrewsipe/FontFixer.git"
-  # or: pip install .
-
-RUNTIME DEPENDENCIES:
-  fonttools, rich (installed automatically with the package)
-
-For more information, see: https://github.com/andrewsipe/FontFixer
-        """,
-    )
-
-    parser.add_argument(
-        "input_path", type=Path, help="Font file or directory containing font files"
-    )
-
-    parser.add_argument(
-        "-r", "--recursive", action="store_true", help="Process directories recursively"
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output-dir",
-        type=Path,
-        help="Output directory (default: overwrite originals)",
-    )
-
-    parser.add_argument(
-        "-j",
-        "--jobs",
-        type=int,
-        default=1,
-        help="Number of parallel workers (default: 1, use 0 for CPU count)",
-    )
-
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
-
-    parser.add_argument(
-        "-n",
-        "--dry-run",
-        action="store_true",
-        help="Show what would be processed without making changes",
-    )
-
-    parser.add_argument(
-        "--handlers",
-        type=str,
-        help="Comma-separated list of handlers to run. Available: os2, style, glyph, kern, name. Default: all",
-    )
-
-    parser.add_argument(
-        "--skip-handlers",
-        type=str,
-        help="Comma-separated list of handlers to skip. Available: os2, style, glyph, kern, name",
-    )
-
-    parser.add_argument(
-        "--validate-only",
-        action="store_true",
-        help="Validate fonts and report issues without applying any fixes",
-    )
-
-    parser.add_argument(
-        "--no-quarantine",
-        action="store_true",
-        help="Disable automatic quarantine of corrupted fonts (quarantine enabled by default)",
-    )
-
+    # Handler blurbs follow HandlerSpec registration order.
+    handlers = {
+        name: HANDLER_BLURBS[name]
+        for name in HandlerSpec.all_short_names()
+        if name in HANDLER_BLURBS
+    }
+    parser = build_parser(fontfixer_version, handlers)
     args = parser.parse_args()
-
     return ProcessingConfig.from_args(args)
 
 

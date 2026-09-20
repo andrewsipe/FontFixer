@@ -1,6 +1,6 @@
 # FontFixer
 
-**Version 1.0.1**
+**Version 1.0.2**
 
 A high-performance font validation and correction tool that applies comprehensive OpenType font fixes in a single pass.
 

@@ -53,7 +53,7 @@ HANDLER_KERN = HandlerSpec(
 HANDLER_NAME = HandlerSpec(
     "name (naming)",
     "name",
-    "Name table cleanup (Windows English only, remove problematic IDs)",
+    "Name table cleanup (Windows English only; drops license 13/14 and other IDs)",
 )
 
 # All handler names (for backward compatibility during transition)

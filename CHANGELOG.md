@@ -5,6 +5,16 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-09-20
+
+### Changed
+- CLI help rewritten: overwrite warning up front; `-n` vs `--validate-only` contrasted; quarantine path documented
+- `--handlers` / `--skip-handlers` mutually exclusive in usage; handler names from one source
+- `--version` added; install/deps sections removed from `--help`
+- `--skip-handlers` / `--handlers` preserve canonical handler order
+- `-o` no longer creates the output directory during `-n` / `--validate-only`
+- `name` handler help names license IDs 13/14 explicitly
+
 ## [1.0.1] - 2026-09-20
 
 ### Added
@@ -13,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Console script is **`fontfixer` only** (`FontFixer` is an optional user alias)
-- `--help` epilog: fixed `-v` example, install notes, FontFixer repo link
 - Dropped FontCore symlink / `.gitmodules` dependency
 
 ## [1.0.0] - 2024-12-XX
