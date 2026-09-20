@@ -20,7 +20,6 @@ from .data_models import (
     HANDLER_STYLE,
     HANDLER_GLYPH,
     HANDLER_KERN,
-    HANDLER_NAME,
 )
 from .corruption_detection import CorruptionDetector
 from .handlers.base_handler import TableHandler
@@ -29,7 +28,6 @@ from .handlers import (
     StyleConsistencyHandler,
     GlyphHandler,
     KernHandler,
-    NameTableHandler,
 )
 
 # Define handler classes in execution order
@@ -39,7 +37,6 @@ HANDLER_CLASSES = [
     (StyleConsistencyHandler, HANDLER_STYLE.full_name),
     (GlyphHandler, HANDLER_GLYPH.full_name),
     (KernHandler, HANDLER_KERN.full_name),
-    (NameTableHandler, HANDLER_NAME.full_name),
 ]
 
 try:
@@ -176,10 +173,6 @@ class FontFixer:
         4. KernHandler (Independent)
            - Removes legacy kern table when GPOS exists
            - No dependencies on other handlers
-
-        5. NameTableHandler (LAST - independent)
-           - Cleans up name table (Windows English only, removes problematic nameIDs)
-           - Runs last as it's a cleanup operation that doesn't affect other handlers
 
         If the order is changed:
         - StyleConsistencyHandler may fail if OS/2 is still v0-v3

@@ -35,34 +35,33 @@ class HandlerSpec:
         return list(cls._registry.keys())
 
 
-# Define all handlers
+# Define all handlers (execution order)
 HANDLER_OS2 = HandlerSpec(
-    "OS/2", "os2", "OS/2 table (version, fsType, monospace, fsSelection)"
+    "OS/2",
+    "os2",
+    "Upgrade OS/2 to v4; installable embedding; monospace; USE_TYPO_METRICS, WWS",
 )
 HANDLER_STYLE = HandlerSpec(
     "post+hhea+OS/2+head (style consistency)",
     "style",
-    "Style consistency (italic angle, fsSelection, macStyle)",
+    "Sync italic/bold angles and flags across post, hhea, OS/2, head (after os2)",
 )
 HANDLER_GLYPH = HandlerSpec(
-    "glyf/CFF + cmap + hmtx (glyphs)", "glyph", "Glyph fixes (.notdef, nbsp)"
+    "glyf/CFF + cmap + hmtx (glyphs)",
+    "glyph",
+    "Ensure .notdef is drawn; ensure nbsp (U+00A0) matches space width",
 )
 HANDLER_KERN = HandlerSpec(
-    "kern+GPOS (kerning)", "kern", "Kerning cleanup (remove legacy kern if GPOS exists)"
-)
-HANDLER_NAME = HandlerSpec(
-    "name (naming)",
-    "name",
-    "Name table cleanup (Windows English only; drops license 13/14 and other IDs)",
+    "kern+GPOS (kerning)",
+    "kern",
+    "Remove legacy kern table when GPOS is present",
 )
 
-# All handler names (for backward compatibility during transition)
 ALL_HANDLERS = [
     HANDLER_OS2.full_name,
     HANDLER_STYLE.full_name,
     HANDLER_GLYPH.full_name,
     HANDLER_KERN.full_name,
-    HANDLER_NAME.full_name,
 ]
 
 

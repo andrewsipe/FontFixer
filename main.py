@@ -19,7 +19,7 @@ from typing import Optional, Tuple, Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Constants
-DEFAULT_VERSION = "1.0.2"
+DEFAULT_VERSION = "1.1.0"
 TOP_FIXES_TO_DISPLAY = 5
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -193,22 +193,18 @@ class ProcessingConfig:
 # ARGUMENT PARSING
 # ============================================================================
 
-# One-line blurbs for --help. Long descriptions stay on HandlerSpec for preflight.
+# One-line blurbs for --help (aligned with HandlerSpec descriptions).
 HANDLER_BLURBS = {
-    "os2": "OS/2 version, embedding permissions, monospace flag, USE_TYPO_METRICS, WWS",
-    "style": "Make italic/bold data agree across post, hhea, OS/2, head (run after os2)",
-    "glyph": ".notdef structure; add nbsp (U+00A0) with the same width as space",
-    "kern": "Remove legacy 'kern' table when a GPOS table exists",
-    "name": (
-        "Windows English name records only; drop license description/URL "
-        "(nameIDs 13/14), preferred family/subfamily (18/19), and IDs 200-203, 55555"
-    ),
+    "os2": "upgrade OS/2 to v4; installable embedding; monospace; USE_TYPO_METRICS, WWS",
+    "style": "sync italic/bold angles and flags across post, hhea, OS/2, head (after os2)",
+    "glyph": "ensure .notdef is drawn; ensure nbsp (U+00A0) matches space width",
+    "kern": "remove legacy kern table when GPOS is present",
 }
 
 DESCRIPTION = """\
-Validate and repair OpenType font metadata in a single pass per font.
+Tidy OpenType fonts in a single pass (OS/2, style flags, glyphs, kern).
 
-WARNING: by default fixes are written over the original files (no backup).
+WARNING: by default changes are written over the original files (no backup).
 Use -o DIR to keep originals, or --validate-only / -n to look first.
 """
 
@@ -216,19 +212,20 @@ Use -o DIR to keep originals, or --validate-only / -n to look first.
 def build_parser(version: str, handlers: dict[str, str]) -> argparse.ArgumentParser:
     """Build the CLI argument parser (help text is the primary UX surface)."""
     names = ",".join(handlers)
-    width = max(len(n) for n in handlers)
-    handler_table = "\n".join(f"  {n:<{width}}  {d}" for n, d in handlers.items())
+    # Match argparse option help: 2-space indent + ~22-char left column.
+    help_col = 22
+    handler_table = "\n".join(f"  {n:<{help_col}}{d}" for n, d in handlers.items())
 
     epilog = f"""\
 handlers (run in this order):
 {handler_table}
 
 examples:
-  %(prog)s --validate-only -v fonts/     report problems, apply no fixes
-  %(prog)s -o fixed/ fonts/              write fixed copies to fixed/
-  %(prog)s -r -j 0 fonts/                fix a whole tree in place, all CPU cores
-  %(prog)s --handlers os2,style fonts/   only the OS/2 and style fixes
-  %(prog)s --skip-handlers name fonts/   everything except name-table cleanup
+  %(prog)s --validate-only -v fonts/     report problems, apply no changes
+  %(prog)s -o tidy/ fonts/               write tidied copies to tidy/
+  %(prog)s -r -j 0 fonts/                tidy a whole tree in place, all CPU cores
+  %(prog)s --handlers os2,style fonts/   only OS/2 and style tidy-ups
+  %(prog)s --skip-handlers kern fonts/   everything except legacy kern removal
 
 exit status: 0 = all fonts OK, 1 = any failure or no fonts found
 

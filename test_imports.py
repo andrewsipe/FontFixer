@@ -28,7 +28,6 @@ def test_imports():
             StyleConsistencyHandler,
             GlyphHandler,
             KernHandler,
-            NameTableHandler,
         )
 
         print("✓ Handler modules imported successfully")
@@ -43,7 +42,6 @@ def test_imports():
             decorators,
             utilities,
             bitfield,
-            name_table_utils,
             style_analyzer,
             corruption_detection,
             font_fixer,

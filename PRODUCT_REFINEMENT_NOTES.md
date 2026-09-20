@@ -22,7 +22,7 @@ CLI flag parity check (declutter date): **identical** argparse surface between a
 | `support/font_fixer.py` | Orchestrator |
 | `support/handlers/*` | Table-specific fixers |
 | `support/corruption_detection.py` | Quarantine / corrupt detection |
-| `support/{bitfield,constants,data_models,decorators,name_table_utils,style_analyzer,utilities}.py` | Shared helpers (all used) |
+| `support/{bitfield,constants,data_models,decorators,style_analyzer,utilities}.py` | Shared helpers (all used) |
 | `test_imports.py` | Smoke import check (not a full pytest suite) |
 | `CHANGELOG.md` / `README.md` / `pyproject.toml` | Packaging + docs (`fontfixer` console script) |
 | `FontCore/` | Vendored slim subset (console + file collector); not a submodule |
@@ -32,15 +32,15 @@ CLI flag parity check (declutter date): **identical** argparse surface between a
 - Vendored FontCore subset; **no** FontCore symlink/submodule.
 - Canonical CLI: **`fontfixer`**. `FontFixer` is an optional user alias only.
 - PushCore: FontFixer is in `PROJECTS_WITHOUT_FONTCORE`.
+- **v1.1.0:** `name` handler removed; use FontNameID for naming. Handlers: os2 → style → glyph → kern.
 
 ## Product-pass refinements (deferred)
 
 1. **Real tests** — `test_imports.py` only proves imports; add fixture-based tests for each handler and quarantine paths.
 2. **Move smoke test** under `tests/` and wire `pytest` in `pyproject.toml`.
-3. **Name-handler policy** — “Windows English only” + dropping nameIDs is aggressive; document as intentional or make opt-in for a “safe” vs “strict” profile.
-4. **Overlap with siblings** — FontFileTools still has GASP / coverage / UPM tools; FontNameID owns name rewriting. Product pitch should stay “single-pass structural fixes,” not full name-table authoring.
-5. **`raw_github_urls.txt`** — PushCore noise; keep out of release artifacts.
-6. **Local `fontfixer.egg-info/`** — gitignored build residue; safe to delete locally anytime.
+3. **Overlap with siblings** — FontFileTools still has GASP / coverage / UPM tools; FontNameID owns name rewriting. Product pitch: post-naming tidy-up before metrics.
+4. **`raw_github_urls.txt`** — PushCore noise; keep out of release artifacts.
+5. **Local `fontfixer.egg-info/`** — gitignored build residue; safe to delete locally anytime.
 
 ## Do not lose
 

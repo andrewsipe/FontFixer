@@ -5,6 +5,18 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-20
+
+### Removed
+- **`name` handler** — naming cleanup belongs in FontNameID; also removes the old
+  aggressive drops of nameIDs 13/14/18/19 from this tool’s default pass
+- `support/handlers/name_handler.py` and `support/name_table_utils.py`
+
+### Changed
+- Positioned as a post-naming / pre-metrics tidy-up (OS/2, style, glyph, kern)
+- Tightened handler help blurbs; handlers list aligned with option help columns
+- Default handlers: `os2,style,glyph,kern`
+
 ## [1.0.2] - 2026-09-20
 
 ### Changed
