@@ -19,7 +19,7 @@ from typing import Optional, Tuple, Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Constants
-DEFAULT_VERSION = "1.1.1"
+DEFAULT_VERSION = "1.1.2"
 TOP_FIXES_TO_DISPLAY = 5
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -201,59 +201,63 @@ HANDLER_BLURBS = {
     "kern": "remove legacy kern table when GPOS is present",
 }
 
-DESCRIPTION = """\
-Tidy OpenType fonts in a single pass (OS/2, style flags, glyphs, kern).
-"""
+DESCRIPTION = "Tidy OpenType fonts in a single pass (OS/2, style flags, glyphs, kern)."
+
+EXAMPLES = [
+    ("fontfixer --validate-only -v fonts/", "report problems, apply no changes"),
+    ("fontfixer -o tidy/ fonts/", "write tidied copies to tidy/"),
+    ("fontfixer -r -j 0 fonts/", "tidy a whole tree in place, all CPU cores"),
+    ("fontfixer --handlers os2,style fonts/", "only OS/2 and style tidy-ups"),
+    ("fontfixer --skip-handlers kern fonts/", "everything except legacy kern removal"),
+]
 
 
 def build_parser(version: str, handlers: dict[str, str]) -> argparse.ArgumentParser:
     """Build the CLI argument parser (help text is the primary UX surface)."""
-    from FontFixer.support.rich_help import RichHelp
-
-    names = ",".join(handlers)
-    # Match argparse option help: 2-space indent + ~22-char left column.
-    help_col = 22
-    handler_table = "\n".join(f"  {n:<{help_col}}{d}" for n, d in handlers.items())
-
-    epilog = f"""\
-handlers (run in this order):
-{handler_table}
-
-examples:
-  %(prog)s --validate-only -v fonts/     report problems, apply no changes
-  %(prog)s -o tidy/ fonts/               write tidied copies to tidy/
-  %(prog)s -r -j 0 fonts/                tidy a whole tree in place, all CPU cores
-  %(prog)s --handlers os2,style fonts/   only OS/2 and style tidy-ups
-  %(prog)s --skip-handlers kern fonts/   everything except legacy kern removal
-
-exit status: 0 = all fonts OK, 1 = any failure or no fonts found
-
-docs: https://github.com/andrewsipe/FontFixer
-"""
+    from FontFixer.support.rich_help import (
+        RichHelp,
+        docs_section,
+        examples_section,
+        exit_status_section,
+        handlers_section,
+    )
 
     p = argparse.ArgumentParser(
         prog="fontfixer",
-        description=DESCRIPTION.strip(),
-        epilog=epilog,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=DESCRIPTION,
         add_help=False,
     )
-    p.add_argument(
+
+    # Groups print in creation order. "general" last moves -h/--version to the bottom.
+    g_in = p.add_argument_group("input")
+    g_out = p.add_argument_group("output and safety")
+    g_sel = p.add_argument_group("fix selection (choose one)")
+    g_run = p.add_argument_group("performance and logging")
+    g_gen = p.add_argument_group("general")
+
+    # Usage-line order follows add order: register -h/--version first.
+    g_gen.add_argument(
         "-h",
         "--help",
         action=RichHelp,
         console=console,
         help="show this help message and exit",
+        footer=[
+            handlers_section(handlers, note="run in this order"),
+            examples_section(EXAMPLES),
+            exit_status_section(
+                {"0": "all fonts OK", "1": "any failure, or no fonts found"}
+            ),
+            docs_section("https://github.com/andrewsipe/FontFixer"),
+        ],
     )
-    p.add_argument("--version", action="version", version=f"%(prog)s {version}")
+    g_gen.add_argument("--version", action="version", version=f"%(prog)s {version}")
 
-    g_in = p.add_argument_group("input")
     g_in.add_argument("input_path", type=Path, help="font file or directory of fonts")
     g_in.add_argument(
         "-r", "--recursive", action="store_true", help="also search subdirectories"
     )
 
-    g_out = p.add_argument_group("output and safety")
     g_out.add_argument(
         "-o",
         "--output-dir",
@@ -281,21 +285,18 @@ docs: https://github.com/andrewsipe/FontFixer
         "<input>/_quarantine/",
     )
 
-    g_sel = p.add_argument_group(
-        "fix selection", "choose at most one; default is all handlers"
-    ).add_mutually_exclusive_group()
-    g_sel.add_argument(
+    sel = g_sel.add_mutually_exclusive_group()
+    sel.add_argument(
         "--handlers",
         metavar="LIST",
-        help=f"run only these handlers, comma-separated ({names})",
+        help=f"run only these handlers, comma-separated ({','.join(handlers)})",
     )
-    g_sel.add_argument(
+    sel.add_argument(
         "--skip-handlers",
         metavar="LIST",
         help="run everything except these handlers, comma-separated",
     )
 
-    g_run = p.add_argument_group("performance and logging")
     g_run.add_argument(
         "-j",
         "--jobs",

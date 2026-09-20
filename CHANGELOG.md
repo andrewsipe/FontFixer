@@ -5,6 +5,12 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-09-20
+
+### Changed
+- Rich help v2: handlers, examples, exit status, and docs rendered as themed sections
+- Move `-h` / `--version` into a trailing `general` group; drop plain-text epilog
+
 ## [1.1.1] - 2026-09-20
 
 ### Changed
