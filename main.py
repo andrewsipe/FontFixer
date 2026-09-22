@@ -248,7 +248,7 @@ def build_parser(version: str, handlers: dict[str, str]) -> argparse.ArgumentPar
             exit_status_section(
                 {"0": "all fonts OK", "1": "any failure, or no fonts found"}
             ),
-            docs_section("https://github.com/andrewsipe/FontFixer"),
+            docs_section("https://andrewsipe.github.io/FontFixer/"),
         ],
     )
     g_gen.add_argument("--version", action="version", version=f"%(prog)s {version}")

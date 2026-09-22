@@ -34,6 +34,16 @@ CLI flag parity check (declutter date): **identical** argparse surface between a
 - PushCore: FontFixer is in `PROJECTS_WITHOUT_FONTCORE`.
 - **v1.1.0:** `name` handler removed; use FontNameID for naming. Handlers: os2 → style → glyph → kern.
 
+## Docs site
+
+Static Pages site in `docs/` (handlers, flags, safety). README is the product
+front door; advanced detail lives on the site.
+
+Enable once on GitHub: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
+URL: https://andrewsipe.github.io/FontFixer/
+
+Optional: set the repo About “Website” field to that URL.
+
 ## Product-pass refinements (deferred)
 
 1. **Real tests** — `test_imports.py` only proves imports; add fixture-based tests for each handler and quarantine paths.

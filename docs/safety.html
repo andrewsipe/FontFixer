@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Safety · FontFixer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">FontFixer <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="handlers.html">Handlers</a>
+        <a href="flags.html">Flags</a>
+        <a href="safety.html" aria-current="page">Safety</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/FontFixer">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">Before you write</p>
+    <h1>Safety</h1>
+    <p class="lede">Three different “look first” modes, plus quarantine for files that won’t open cleanly. Mixing them up is the main source of surprise.</p>
+
+    <h2>Overwrite vs keep originals</h2>
+    <p>Default behavior writes fixes over the input files. There is no automatic backup.</p>
+    <ul>
+      <li><code>-o DIR</code> — write tidied fonts into a new directory; leave inputs alone.</li>
+      <li>Without <code>-o</code> — originals are replaced when handlers apply changes.</li>
+    </ul>
+
+    <h2><code>-n</code> vs <code>--validate-only</code></h2>
+    <table>
+      <thead>
+        <tr><th>Flag</th><th>Opens fonts?</th><th>Applies fixes?</th><th>Use when</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>-n, --dry-run</code></td>
+          <td>No</td>
+          <td>No</td>
+          <td>You only want the file list and which handlers would run</td>
+        </tr>
+        <tr>
+          <td><code>--validate-only</code></td>
+          <td>Yes</td>
+          <td>No</td>
+          <td>You want a real problem report before writing</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout warn">
+      <strong>Common mix-up.</strong> <code>-n</code> never opens a font. If you need to see what’s wrong inside the tables, use <code>--validate-only</code> (often with <code>-v</code>).
+    </div>
+
+    <h2>Quarantine</h2>
+    <p>When a file looks corrupted or fails to open, FontFixer moves it to <code>&lt;input&gt;/_quarantine/</code> by default so a bad file doesn’t sit mixed with clean ones.</p>
+    <ul>
+      <li>Default — quarantine enabled</li>
+      <li><code>--no-quarantine</code> — leave the bad file where it is</li>
+    </ul>
+
+    <h2>Suggested first pass</h2>
+    <pre><code># 1) What would run?
+fontfixer -n -r fonts/
+
+# 2) What’s actually wrong?
+fontfixer --validate-only -v -r fonts/
+
+# 3) Write somewhere safe
+fontfixer -o tidy/ -r fonts/</code></pre>
+  </main>
+
+  <footer class="site-footer">
+    <a href="flags.html">← Flags</a>
+    · <a href="index.html">Home</a>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FontFixer docs</title>
+  <meta name="description" content="OpenType tidy-up — handlers, flags, and safety for fontfixer." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">FontFixer <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html" aria-current="page">Home</a>
+        <a href="handlers.html">Handlers</a>
+        <a href="flags.html">Flags</a>
+        <a href="safety.html">Safety</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/FontFixer">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">Documentation · v1.1.2</p>
+    <h1>OpenType tidy-up, one pass</h1>
+    <p class="lede">
+      <code>fontfixer</code> opens each font once, runs selected handlers, and writes once. It is the structural step between naming (FontNameID) and metrics (ebrium).
+    </p>
+
+    <div class="callout warn">
+      <strong>In place.</strong> Fixes overwrite originals by default — no backup. Keep copies with <code>-o DIR</code>, inspect with <code>--validate-only</code>, or list only with <code>-n</code>.
+    </div>
+
+    <pre><code>pipx install "git+https://github.com/andrewsipe/FontFixer.git"
+fontfixer --validate-only -v fonts/</code></pre>
+
+    <div class="card-grid">
+      <a class="card" href="handlers.html">
+        <h2>Handlers</h2>
+        <p>os2 → style → glyph → kern — what each does and why order matters.</p>
+      </a>
+      <a class="card" href="flags.html">
+        <h2>Flag reference</h2>
+        <p>Input, output, handler selection, jobs, and exit status.</p>
+      </a>
+      <a class="card" href="safety.html">
+        <h2>Safety</h2>
+        <p>Overwrite vs <code>-o</code>, dry-run vs validate-only, and quarantine.</p>
+      </a>
+      <a class="card" href="https://andrewsipe.github.io/ebrium/">
+        <h2>Next: ebrium</h2>
+        <p>After tidy-up, normalize vertical metrics across the family.</p>
+      </a>
+    </div>
+
+    <p>CLI help stays the live source for wording: <code>fontfixer --help</code>.</p>
+  </main>
+
+  <footer class="site-footer">
+    <a href="https://github.com/andrewsipe/FontFixer">andrewsipe/FontFixer</a>
+    · static Pages site from the <code>docs/</code> folder on <code>main</code>
+  </footer>
+</body>
+</html>

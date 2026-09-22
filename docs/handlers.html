@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Handlers · FontFixer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">FontFixer <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="handlers.html" aria-current="page">Handlers</a>
+        <a href="flags.html">Flags</a>
+        <a href="safety.html">Safety</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/FontFixer">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">Default pass</p>
+    <h1>Handlers</h1>
+    <p class="lede">Four table-focused tidy-ups. When more than one is enabled, they always run in this order — not the order you typed them.</p>
+
+    <ol class="steps">
+      <li>
+        <span class="term">os2</span>
+        Upgrade OS/2 to version 4; set installable embedding; detect monospace; enable <code>USE_TYPO_METRICS</code> and WWS-related consistency. Runs first because style depends on OS/2 v4.
+      </li>
+      <li>
+        <span class="term">style</span>
+        Sync italic/bold angles and flags across <code>post</code>, <code>hhea</code>, OS/2, and <code>head</code>. Meant to run after <code>os2</code>.
+      </li>
+      <li>
+        <span class="term">glyph</span>
+        Ensure <code>.notdef</code> is drawn; ensure non-breaking space (U+00A0) matches space width. Independent of the others.
+      </li>
+      <li>
+        <span class="term">kern</span>
+        Remove the legacy <code>kern</code> table when GPOS kerning is present. Independent.
+      </li>
+    </ol>
+
+    <h2>Selecting handlers</h2>
+    <p><code>--handlers</code> and <code>--skip-handlers</code> are mutually exclusive. Names are comma-separated. Selection is filtered back into canonical order (os2 → style → glyph → kern).</p>
+    <pre><code>fontfixer --handlers os2,style fonts/
+fontfixer --skip-handlers kern fonts/</code></pre>
+
+    <h2>Out of scope</h2>
+    <ul>
+      <li><strong>Name tables</strong> — use <a href="https://github.com/andrewsipe/FontNameID">FontNameID</a> (the old <code>name</code> handler was removed in 1.1.0).</li>
+      <li><strong>Vertical metrics</strong> — use <a href="https://andrewsipe.github.io/ebrium/">ebrium</a>.</li>
+      <li><strong>Glyph outlines / advances</strong> — not modified beyond the glyph tidy-ups above.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>Single pass.</strong> Each font is opened once, all selected handlers run, then the font is written once (unless validate-only / dry-run).
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a href="index.html">← Home</a>
+    · <a href="flags.html">Flags →</a>
+  </footer>
+</body>
+</html>

@@ -15,6 +15,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/andrewsipe/FontFixer"
+Documentation = "https://andrewsipe.github.io/FontFixer/"
 Repository = "https://github.com/andrewsipe/FontFixer"
 
 [project.scripts]
