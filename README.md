@@ -63,5 +63,5 @@ For handler detail, every flag, and how `-n` differs from `--validate-only`, use
 ## Related
 
 - [FontNameID](https://github.com/andrewsipe/FontNameID) — name-table editing  
-- [ebrium](https://github.com/andrewsipe/ebrium) — vertical metrics normalization  
+- [Ebrium](https://github.com/andrewsipe/ebrium) — vertical metrics normalization  
 - [Changelog](CHANGELOG.md)
