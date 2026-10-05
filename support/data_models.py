@@ -39,12 +39,12 @@ class HandlerSpec:
 HANDLER_OS2 = HandlerSpec(
     "OS/2",
     "os2",
-    "Upgrade OS/2 to v4; installable embedding; monospace; USE_TYPO_METRICS, WWS",
+    "Upgrade OS/2 to v4; installable embedding; monospace; USE_TYPO_METRICS",
 )
 HANDLER_STYLE = HandlerSpec(
     "post+hhea+OS/2+head (style consistency)",
     "style",
-    "Sync italic/bold angles and flags across post, hhea, OS/2, head (after os2)",
+    "Sync italic/bold angles and flags across post, hhea, OS/2, head, CFF (after os2)",
 )
 HANDLER_GLYPH = HandlerSpec(
     "glyf/CFF + cmap + hmtx (glyphs)",
@@ -54,7 +54,7 @@ HANDLER_GLYPH = HandlerSpec(
 HANDLER_KERN = HandlerSpec(
     "kern+GPOS (kerning)",
     "kern",
-    "Remove legacy kern table when GPOS is present",
+    "Remove legacy kern table when GPOS kern/vkrn is present",
 )
 
 ALL_HANDLERS = [

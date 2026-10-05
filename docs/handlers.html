@@ -16,6 +16,7 @@
       <nav class="nav" aria-label="Primary">
         <a href="index.html">Home</a>
         <a href="handlers.html" aria-current="page">Handlers</a>
+        <a href="family-slant.html">Family slant</a>
         <a href="flags.html">Flags</a>
         <a href="safety.html">Safety</a>
       </nav>
@@ -24,18 +25,24 @@
   </header>
 
   <main>
-    <p class="meta">Default pass</p>
+    <p class="meta">Default pass · v1.3.2</p>
     <h1>Handlers</h1>
     <p class="lede">Four table-focused tidy-ups. When more than one is enabled, they always run in this order — not the order you typed them.</p>
 
     <ol class="steps">
       <li>
         <span class="term">os2</span>
-        Upgrade OS/2 to version 4; set installable embedding; detect monospace; enable <code>USE_TYPO_METRICS</code> and WWS-related consistency. Runs first because style depends on OS/2 v4.
+        Upgrade OS/2 to version 4; set installable embedding; detect monospace; enable <code>USE_TYPO_METRICS</code>. The WWS bit is left unchanged (name-table claim this tool does not verify). Resolves <code>sxHeight</code> / <code>sCapHeight</code> via cmap (<code>x</code> / <code>H</code>) with uni-name fallbacks. Runs first because style depends on OS/2 v4.
       </li>
       <li>
         <span class="term">style</span>
-        Sync italic/bold angles and flags across <code>post</code>, <code>hhea</code>, OS/2, and <code>head</code>. Meant to run after <code>os2</code>.
+        Sync italic/bold angles and flags across <code>post</code>, <code>hhea</code>, OS/2, <code>head</code>, and CFF <code>ItalicAngle</code>.
+        <ul>
+          <li><strong>Angles</strong> — median of uppercase stem-glyph samples via cmap (<code>H</code>/<code>I</code>/<code>N</code>, with <code>uniXXXX</code> fallbacks). Samples below a 2° floor are ignored; dominant sign preferred. Named italics keep a non-zero <code>post</code> angle when measurement is weak. Non-zero roman angles are allowed.</li>
+          <li><strong>Italic / oblique bits</strong> — follow name labels only. Measured slant does <em>not</em> mark a Roman as italic. Bold weight (700 / “Bold”) stays intentional.</li>
+          <li><strong>macStyle</strong> — clears only bold/italic bits (does not zero the whole field).</li>
+        </ul>
+        Meant to run after <code>os2</code>. Family-relative flag advice is a separate post-pass — see <a href="family-slant.html">Family slant</a>.
       </li>
       <li>
         <span class="term">glyph</span>
@@ -43,9 +50,15 @@
       </li>
       <li>
         <span class="term">kern</span>
-        Remove the legacy <code>kern</code> table when GPOS kerning is present. Independent.
+        Remove the legacy <code>kern</code> table when GPOS advertises <code>kern</code> or <code>vkrn</code> (not merely when any GPOS table exists). Independent.
       </li>
     </ol>
+
+    <h2>Family slant review</h2>
+    <p>
+      After a normal interactive run that includes <code>style</code>, FontFixer surveys families by measured italic angle and may recommend italic/oblique <em>flag</em> fixes when upright vs slanted clusters disagree with current bits. Prompt: Apply all / Review each / Quit. Incomplete, roman-only, or ambiguous families are skipped; angles are not rewritten.
+    </p>
+    <p><a href="family-slant.html">Full family slant rules →</a></p>
 
     <h2>Selecting handlers</h2>
     <p><code>--handlers</code> and <code>--skip-handlers</code> are mutually exclusive. Names are comma-separated. Selection is filtered back into canonical order (os2 → style → glyph → kern).</p>
@@ -60,13 +73,13 @@ fontfixer --skip-handlers kern fonts/</code></pre>
     </ul>
 
     <div class="callout">
-      <strong>Single pass.</strong> Each font is opened once, all selected handlers run, then the font is written once (unless validate-only / dry-run).
+      <strong>Single pass.</strong> Each font is opened once, all selected handlers run, then the font is written once (unless validate-only / dry-run). Family slant review is a separate interactive step afterward.
     </div>
   </main>
 
   <footer class="site-footer">
     <a href="index.html">← Home</a>
-    · <a href="flags.html">Flags →</a>
+    · <a href="family-slant.html">Family slant →</a>
   </footer>
 </body>
 </html>

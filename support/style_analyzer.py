@@ -5,8 +5,12 @@ This module provides the FontStyleAnalyzer class for determining font style
 characteristics including italic angle, bold weight, and oblique vs italic distinction.
 """
 
+from __future__ import annotations
+
 import math
 import re
+from statistics import median
+from typing import Iterable, List, Optional, Sequence
 
 try:
     from fontTools.ttLib import TTFont
@@ -16,6 +20,26 @@ except ImportError:
     StatisticsPen = None
 
 from .constants import WEIGHT_BOLD
+from .utilities import glyph_name_for_codepoint
+
+# Uppercase stems via Unicode; cmap resolves uniXXXX / custom names.
+# Lowercase is skipped: StatisticsPen often reports the wrong sign on italic lc.
+_SLANT_CODEPOINTS: Sequence[int] = (
+    0x0048,  # H
+    0x0049,  # I
+    0x004E,  # N
+)
+
+_SLANT_NAME_FALLBACKS: Sequence[str] = (
+    "H",
+    "uni0048",
+    "I",
+    "uni0049",
+    "N",
+    "uni004E",
+)
+
+_NAME_IDS_STYLE = (1, 2, 4, 6, 16, 17)
 
 
 class FontStyleAnalyzer:
@@ -64,77 +88,117 @@ class FontStyleAnalyzer:
             self._analyze_style()
         return self._is_bold
 
-    def _calculate_italic_angle(self, min_slant: float = 2.0) -> float:
-        """
-        Calculate italic angle using StatisticsPen on 'H' glyph.
+    def _style_name_strings(self) -> List[str]:
+        """Lowercased name-table strings used for style words."""
+        if "name" not in self.font:
+            return []
+        names: List[str] = []
+        for record in self.font["name"].names:
+            if record.nameID in _NAME_IDS_STYLE:
+                try:
+                    names.append(record.toUnicode().lower())
+                except Exception:
+                    continue
+        return names
 
-        Based on FoundryTools logic:
-        - Uses StatisticsPen to calculate slant from 'H' glyph
-        - Returns 0 if abs(angle) < min_slant (considers upright)
-        - Returns calculated angle otherwise
-        """
+    def _name_implies_oblique(self) -> bool:
+        return any(re.search(r"\boblique\b", s) for s in self._style_name_strings())
+
+    def _name_implies_italic(self) -> bool:
+        return any(re.search(r"\bitalic\b", s) for s in self._style_name_strings())
+
+    def _iter_slant_glyph_names(self) -> Iterable[str]:
+        """Yield unique glyph names for slant sampling (cmap first, then names)."""
+        seen = set()
+        glyph_set = self.font.getGlyphSet()
+
+        for codepoint in _SLANT_CODEPOINTS:
+            name = glyph_name_for_codepoint(
+                self.font, codepoint, name_fallbacks=()
+            )
+            if name and name not in seen and name in glyph_set:
+                seen.add(name)
+                yield name
+
+        for name in _SLANT_NAME_FALLBACKS:
+            if name not in seen and name in glyph_set:
+                seen.add(name)
+                yield name
+
+    def _measure_glyph_angle(self, glyph_name: str) -> Optional[float]:
+        """Return italic angle in degrees from one glyph, or None on failure."""
         try:
             glyph_set = self.font.getGlyphSet()
-            if "H" not in glyph_set:
-                return 0.0
-
             pen = StatisticsPen(glyph_set)
-            glyph_set["H"].draw(pen)
-
-            # StatisticsPen.slant is the tangent of the angle
-            # Convert to degrees: angle = -arctan(slant) in degrees
+            glyph_set[glyph_name].draw(pen)
             slant = pen.slant
-            angle = -math.degrees(math.atan(slant)) if slant else 0.0
-
-            # Round to reasonable precision
-            angle = round(angle, 2)
-
-            # If abs angle is below minimum, consider it upright
-            if abs(angle) < min_slant:
-                return 0.0
-
-            return angle
-
+            if not slant:
+                return None
+            return -math.degrees(math.atan(slant))
         except Exception:
-            return 0.0
+            return None
+
+    def _calculate_italic_angle(self, min_slant: float = 2.0) -> float:
+        """
+        Calculate italic angle from multiple stem glyphs.
+
+        - Measure H/I/N/h/n via cmap (with uniXXXX name fallbacks)
+        - Use the median of samples with |angle| >= min_slant
+        - If none clear the floor but names say italic/oblique, keep a
+          non-zero post.italicAngle instead of forcing 0
+        """
+        samples: List[float] = []
+        for glyph_name in self._iter_slant_glyph_names():
+            angle = self._measure_glyph_angle(glyph_name)
+            if angle is not None and abs(angle) >= min_slant:
+                samples.append(angle)
+
+        if samples:
+            # Prefer the dominant sign so one noisy glyph cannot flip the result.
+            neg = [a for a in samples if a < 0]
+            pos = [a for a in samples if a > 0]
+            if len(neg) > len(pos):
+                samples = neg
+            elif len(pos) > len(neg):
+                samples = pos
+            return round(float(median(samples)), 2)
+
+        # Measurement failed or stayed under the floor — do not zero out a
+        # named italic/oblique that already carries a post angle.
+        if self._name_implies_italic() or self._name_implies_oblique():
+            if "post" in self.font:
+                try:
+                    post_angle = float(self.font["post"].italicAngle or 0.0)
+                except (TypeError, ValueError):
+                    post_angle = 0.0
+                if abs(post_angle) >= 0.1:
+                    return round(post_angle, 2)
+
+        return 0.0
 
     def _analyze_style(self):
-        """Analyze font style from names and metrics."""
-        is_slanted = abs(self.italic_angle) >= 2.0
+        """Analyze style flags from names; angle stays measurement-driven."""
+        name_oblique = self._name_implies_oblique()
+        name_italic = self._name_implies_italic()
 
-        self._is_italic = False
-        self._is_oblique = False
+        # Flags follow labels only — measured slant must not mark a Roman italic.
+        # Angle / caret remain honest to outline measurement elsewhere.
+        self._is_oblique = name_oblique
+        self._is_italic = name_italic and not name_oblique
+
+        # Bold: intentional RIBBI link — weight 700 or the word "Bold" only.
         self._is_bold = False
-
-        # Check for oblique/italic in names
-        if is_slanted and "name" in self.font:
-            for record in self.font["name"].names:
-                if record.nameID in [1, 2, 4, 6]:  # Family, Subfamily, Full, PostScript
-                    name_str = record.toUnicode().lower()
-                    # Check for "oblique" first (more specific)
-                    if re.search(r"\boblique\b", name_str):
-                        self._is_oblique = True
-                        break
-                    # Check for "italic" (but not if already found oblique)
-                    elif re.search(r"\bitalic\b", name_str):
-                        self._is_italic = True
-
-            # Default to italic if slanted but no explicit name found
-            if not self._is_oblique and not self._is_italic:
-                self._is_italic = True
-
-        # Check for bold
         if "OS/2" in self.font:
             os2 = self.font["OS/2"]
             if hasattr(os2, "usWeightClass") and os2.usWeightClass == WEIGHT_BOLD:
                 self._is_bold = True
-            else:
-                # Fallback to name check
-                if "name" in self.font:
-                    for record in self.font["name"].names:
-                        if record.nameID in [1, 2, 4, 6]:
+            elif "name" in self.font:
+                for record in self.font["name"].names:
+                    if record.nameID in _NAME_IDS_STYLE:
+                        try:
                             name_str = record.toUnicode().lower()
-                            # Use word boundary regex to avoid false matches
-                            if re.search(r"\bbold\b", name_str):
-                                self._is_bold = True
-                                break
+                        except Exception:
+                            continue
+                        if re.search(r"\bbold\b", name_str):
+                            self._is_bold = True
+                            break

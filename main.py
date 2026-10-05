@@ -19,7 +19,7 @@ from typing import Optional, Tuple, Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Constants
-DEFAULT_VERSION = "1.1.2"
+DEFAULT_VERSION = "1.3.1"
 TOP_FIXES_TO_DISPLAY = 5
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
@@ -64,6 +64,11 @@ from FontFixer.support.data_models import (
     HandlerSpec,
     ALL_HANDLERS,
     _get_handler_spec_by_full_name,
+)
+from FontFixer.support.family_slant_review import (
+    run_family_slant_review,
+    style_handler_enabled,
+    successful_font_paths,
 )
 
 
@@ -195,10 +200,10 @@ class ProcessingConfig:
 
 # One-line blurbs for --help (aligned with HandlerSpec descriptions).
 HANDLER_BLURBS = {
-    "os2": "upgrade OS/2 to v4; installable embedding; monospace; USE_TYPO_METRICS, WWS",
-    "style": "sync italic/bold angles and flags across post, hhea, OS/2, head (after os2)",
+    "os2": "upgrade OS/2 to v4; installable embedding; monospace; USE_TYPO_METRICS",
+    "style": "sync italic/bold angles and flags across post, hhea, OS/2, head, CFF (after os2)",
     "glyph": "ensure .notdef is drawn; ensure nbsp (U+00A0) matches space width",
-    "kern": "remove legacy kern table when GPOS is present",
+    "kern": "remove legacy kern table when GPOS kern/vkrn is present",
 }
 
 DESCRIPTION = "Tidy OpenType fonts in a single pass (OS/2, style flags, glyphs, kern)."
@@ -471,6 +476,23 @@ def main():
 
     # Display summary
     display_summary(config, results)
+
+    # Family slant review — interactive flag advice (no new CLI flag)
+    maybe_run_family_slant_review(config, results)
+
+
+def maybe_run_family_slant_review(config: ProcessingConfig, results: list[Dict]) -> None:
+    """Post-pass: diagnose family angles and prompt to fix unclear italic flags."""
+    if config.validate_only or config.dry_run:
+        return
+    if not style_handler_enabled(config.enabled_handlers):
+        return
+
+    paths = successful_font_paths(results)
+    if len(paths) < 2:
+        return
+
+    run_family_slant_review(paths, interactive=True)
 
 
 def _display_handler_list(config: ProcessingConfig):

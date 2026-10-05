@@ -1,7 +1,7 @@
 """
 Style consistency handler.
 
-This handler ensures consistency across post, hhea, OS/2, and head tables
+This handler ensures consistency across post, hhea, OS/2, head, and CFF
 for font style attributes including italic angle, caret slope, and style flags.
 """
 
@@ -10,8 +10,10 @@ from typing import Dict, Any, Tuple, Any as AnyType
 
 try:
     from fontTools.ttLib import TTFont
+    from fontTools.misc.roundTools import otRound
 except ImportError:
     TTFont = None  # Type hint fallback
+    otRound = round  # type: ignore[assignment,misc]
 
 from .base_handler import TableHandler
 from ..data_models import HANDLER_STYLE
@@ -24,10 +26,11 @@ from ..decorators import conditional_fix
 
 class StyleConsistencyHandler(TableHandler):
     """
-    Ensures consistency across post, hhea, OS/2, and head tables for style.
+    Ensures consistency across post, hhea, OS/2, head, and CFF for style.
 
     Responsibilities:
     - post.italicAngle matches calculated angle
+    - CFF TopDict.ItalicAngle matches (CFF fonts only)
     - hhea.caretSlope matches italic angle
     - OS/2.fsSelection matches style (italic, oblique, bold, regular)
     - head.macStyle matches style (bold, italic)
@@ -70,7 +73,40 @@ class StyleConsistencyHandler(TableHandler):
             "macstyle_correct", lambda: self._validate_macstyle(), "macStyle flags"
         )
 
+        # Validate CFF ItalicAngle when present
+        self.validate_condition(
+            "cff_italic_angle_correct",
+            lambda: self._validate_cff_italic_angle(),
+            "CFF ItalicAngle",
+        )
+
         return self.validations
+
+    def _cff_top_dict(self):
+        """Return CFF TopDict if this is a non-CFF2 PostScript font."""
+        if "CFF " not in self.font or "CFF2" in self.font:
+            return None
+        try:
+            cff = self.font["CFF "].cff
+            if hasattr(cff, "topDictIndex") and len(cff.topDictIndex) > 0:
+                return cff.topDictIndex[0]
+        except Exception:
+            return None
+        return None
+
+    def _validate_cff_italic_angle(self) -> Tuple[bool, str]:
+        """Helper: validate CFF TopDict.ItalicAngle against analyzed angle."""
+        top_dict = self._cff_top_dict()
+        if top_dict is None:
+            return (True, "CFF table not present")
+
+        current = getattr(top_dict, "ItalicAngle", 0) or 0
+        expected = otRound(self.style_analyzer.italic_angle)
+        ok = otRound(current) == expected
+        return (
+            ok,
+            f"Current: {current}°, Expected: {expected}°",
+        )
 
     def _validate_caret_slope(self) -> Tuple[bool, str]:
         """Helper: validate hhea caret slope."""
@@ -151,6 +187,7 @@ class StyleConsistencyHandler(TableHandler):
         return any(
             [
                 self._fix_italic_angle(),
+                self._fix_cff_italic_angle(),
                 self._fix_caret_slope(),
                 self._fix_style_flags(),
             ]
@@ -174,6 +211,25 @@ class StyleConsistencyHandler(TableHandler):
             return True
 
         return False
+
+    @conditional_fix("cff_italic_angle_correct")
+    def _fix_cff_italic_angle(self) -> bool:
+        """Sync CFF TopDict.ItalicAngle with the analyzed angle."""
+        top_dict = self._cff_top_dict()
+        if top_dict is None:
+            return False
+
+        calculated = otRound(self.style_analyzer.italic_angle)
+        old_angle = getattr(top_dict, "ItalicAngle", 0) or 0
+
+        if otRound(old_angle) == calculated:
+            return False
+
+        top_dict.ItalicAngle = calculated
+        self._track_change(
+            "cff_italic_angle", f"{old_angle} deg", f"{calculated} deg", True
+        )
+        return True
 
     @conditional_fix("caret_slope_correct")
     def _fix_caret_slope(self) -> bool:
@@ -281,8 +337,10 @@ class StyleConsistencyHandler(TableHandler):
             os2.fsSelection = FS_SELECTION.flags["REGULAR"].set(os2.fsSelection)
 
     def _apply_macstyle(self, head: AnyType) -> None:
-        """Set macStyle bits based on style analysis."""
-        head.macStyle = 0
+        """Set macStyle bold/italic bits based on style analysis."""
+        # Clear only bold/italic; leave other macStyle bits alone.
+        head.macStyle = MAC_STYLE.flags["BOLD"].clear(head.macStyle)
+        head.macStyle = MAC_STYLE.flags["ITALIC"].clear(head.macStyle)
 
         if self.style_analyzer.is_bold:
             head.macStyle = MAC_STYLE.flags["BOLD"].set(head.macStyle)

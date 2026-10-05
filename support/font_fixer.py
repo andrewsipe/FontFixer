@@ -158,11 +158,12 @@ class FontFixer:
 
         1. OS2TableHandler (FIRST)
            - Upgrades OS/2 table to version 4
-           - Enables OS/2 v4-specific features (USE_TYPO_METRICS, WWS flags, OBLIQUE bit)
+           - Enables OS/2 v4-specific features (USE_TYPO_METRICS; OBLIQUE available for style)
+           - Leaves the WWS bit unchanged
            - Must run first because StyleConsistencyHandler depends on OS/2 v4 being current
 
         2. StyleConsistencyHandler (SECOND - depends on #1)
-           - Validates and fixes style consistency across post, hhea, OS/2, and head tables
+           - Validates and fixes style consistency across post, hhea, OS/2, head, and CFF
            - Uses OS/2 v4-specific flags (OBLIQUE bit requires v4+)
            - Will fail validation if OS/2 version < 4, so OS2TableHandler must upgrade first
 
@@ -171,7 +172,7 @@ class FontFixer:
            - No dependencies on other handlers
 
         4. KernHandler (Independent)
-           - Removes legacy kern table when GPOS exists
+           - Removes legacy kern table when GPOS has kern/vkrn features
            - No dependencies on other handlers
 
         If the order is changed:

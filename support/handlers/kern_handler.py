@@ -1,7 +1,7 @@
 """
 Kern table handler.
 
-This handler removes legacy kern tables when modern GPOS tables exist.
+This handler removes legacy kern tables when GPOS already provides kerning.
 """
 
 from typing import Dict, Any
@@ -13,6 +13,7 @@ except ImportError:
 
 from .base_handler import TableHandler
 from ..data_models import HANDLER_KERN
+from ..utilities import gpos_has_kerning
 
 
 class KernHandler(TableHandler):
@@ -20,7 +21,7 @@ class KernHandler(TableHandler):
     Handles kern table cleanup.
 
     Implements fix 10:
-    - Remove legacy kern table if GPOS exists
+    - Remove legacy kern table if GPOS has kern/vkrn features
     """
 
     def get_table_name(self) -> str:
@@ -30,21 +31,25 @@ class KernHandler(TableHandler):
         """Validate kerning table state."""
         has_gpos = "GPOS" in self.font
         has_kern = "kern" in self.font
+        has_gpos_kern = gpos_has_kerning(self.font)
 
+        # Redundant only when legacy kern coexists with GPOS kerning features.
+        redundant = has_kern and has_gpos_kern
         self._track_validation(
             "kern_redundant",
-            not (has_gpos and has_kern),
-            f"Status: GPOS={has_gpos}, kern={has_kern}, Compliant: {not (has_gpos and has_kern)}",
+            not redundant,
+            f"Status: GPOS={has_gpos}, GPOS_kern={has_gpos_kern}, kern={has_kern}, "
+            f"Compliant: {not redundant}",
         )
 
         return self.validations
 
     def fix(self) -> bool:
-        """Remove legacy kern table if needed."""
+        """Remove legacy kern table if GPOS already kerns."""
         if not self.validations.get("kern_redundant", {}).get("valid", True):
-            if "GPOS" in self.font and "kern" in self.font:
+            if "kern" in self.font and gpos_has_kerning(self.font):
                 del self.font["kern"]
                 self._track_change("has_kern", True, False, True)
-                self._track_change("has_GPOS", True, True, False, info_only=True)
+                self._track_change("has_GPOS_kern", True, True, False, info_only=True)
                 return True
         return False

@@ -31,7 +31,7 @@ class OS2TableHandler(TableHandler):
     - Table version management (upgrade to version 4)
     - Embedding permissions (fsType = 0 for installable)
     - Width classification (monospace detection, xAvgCharWidth)
-    - Selection flags (USE_TYPO_METRICS, WWS bits)
+    - Selection flags (USE_TYPO_METRICS; WWS left unchanged)
     - Metrics (sxHeight, sCapHeight, ulCodePageRange)
     """
 
@@ -345,11 +345,11 @@ class OS2TableHandler(TableHandler):
 
         fs_selection = getattr(os2, "fsSelection", 0)
         has_use_typo = FS_SELECTION.flags["USE_TYPO_METRICS"].is_set(fs_selection)
-        has_wws = FS_SELECTION.flags["WWS"].is_set(fs_selection)
-        is_valid = has_use_typo and has_wws
+        # WWS is left untouched — it claims a name-table model this tool does not verify.
+        is_valid = has_use_typo
         return (
             is_valid,
-            f"Status: USE_TYPO_METRICS={has_use_typo}, WWS={has_wws}, Compliant: {is_valid}",
+            f"Status: USE_TYPO_METRICS={has_use_typo}, Compliant: {is_valid}",
         )
 
     def _is_monospace_flags_correct(self, is_mono: bool) -> bool:
@@ -473,36 +473,41 @@ class OS2TableHandler(TableHandler):
         return True
 
     def _calculate_metrics(self):
-        """Calculate sxHeight and sCapHeight from glyphs."""
+        """Calculate sxHeight and sCapHeight from glyphs (cmap-aware)."""
+        from fontTools.pens.boundsPen import BoundsPen
+
+        from ..utilities import glyph_name_for_codepoint
+
         os2 = self.font["OS/2"]
+        glyph_set = self.font.getGlyphSet()
 
-        # Calculate sxHeight from 'x' glyph if available
+        # sxHeight from U+0078 (x)
         if os2.sxHeight == 0:
-            try:
-                glyph_set = self.font.getGlyphSet()
-                if "x" in glyph_set:
-                    from fontTools.pens.boundsPen import BoundsPen
-
+            x_name = glyph_name_for_codepoint(
+                self.font, 0x0078, name_fallbacks=("x", "uni0078")
+            )
+            if x_name and x_name in glyph_set:
+                try:
                     pen = BoundsPen(glyph_set)
-                    glyph_set["x"].draw(pen)
+                    glyph_set[x_name].draw(pen)
                     if pen.bounds:
                         os2.sxHeight = int(round(pen.bounds[3]))
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
-        # Calculate sCapHeight from 'H' glyph if available
+        # sCapHeight from U+0048 (H)
         if os2.sCapHeight == 0:
-            try:
-                glyph_set = self.font.getGlyphSet()
-                if "H" in glyph_set:
-                    from fontTools.pens.boundsPen import BoundsPen
-
+            h_name = glyph_name_for_codepoint(
+                self.font, 0x0048, name_fallbacks=("H", "uni0048")
+            )
+            if h_name and h_name in glyph_set:
+                try:
                     pen = BoundsPen(glyph_set)
-                    glyph_set["H"].draw(pen)
+                    glyph_set[h_name].draw(pen)
                     if pen.bounds:
                         os2.sCapHeight = int(round(pen.bounds[3]))
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
     @conditional_fix("fstype_installable")
     def _fix_fstype(self) -> bool:
@@ -643,7 +648,7 @@ class OS2TableHandler(TableHandler):
 
     @conditional_fix("fsselection_flags_set")
     def _fix_fsselection_flags(self) -> bool:
-        """Set USE_TYPO_METRICS and WWS flags."""
+        """Set USE_TYPO_METRICS; leave WWS unchanged."""
         os2 = self.font["OS/2"]
 
         if os2.version < 4:
@@ -651,7 +656,6 @@ class OS2TableHandler(TableHandler):
 
         original_fs = os2.fsSelection
         os2.fsSelection = FS_SELECTION.flags["USE_TYPO_METRICS"].set(os2.fsSelection)
-        os2.fsSelection = FS_SELECTION.flags["WWS"].set(os2.fsSelection)
 
         if os2.fsSelection != original_fs:
             self._track_bitfield_change(

@@ -36,8 +36,8 @@ CLI flag parity check (declutter date): **identical** argparse surface between a
 
 ## Docs site
 
-Static Pages site in `docs/` (handlers, flags, safety). README is the product
-front door; advanced detail lives on the site.
+Static Pages site in `docs/` (handlers, family slant, flags, safety). README is
+the product front door; advanced detail lives on the site.
 
 Enable once on GitHub: **Settings → Pages → Deploy from a branch → `main` / `/docs`**.
 URL: https://andrewsipe.github.io/FontFixer/
@@ -46,14 +46,28 @@ Optional: set the repo About “Website” field to that URL.
 
 ## Product-pass refinements (deferred)
 
-1. **Real tests** — `test_imports.py` only proves imports; add fixture-based tests for each handler and quarantine paths.
+1. **Real tests** — `test_imports.py` only proves imports; add fixture-based tests for each handler, quarantine paths, and family slant grouping/skip cases.
 2. **Move smoke test** under `tests/` and wire `pytest` in `pyproject.toml`.
 3. **Overlap with siblings** — FontFileTools still has GASP / coverage / UPM tools; FontNameID owns name rewriting. Product pitch: post-naming tidy-up before metrics.
 4. **`raw_github_urls.txt`** — PushCore noise; keep out of release artifacts.
 5. **Local `fontfixer.egg-info/`** — gitignored build residue; safe to delete locally anytime.
 
+## Family slant review — shipped (v1.3.0–1.3.2)
+
+Shipped in `support/family_slant_review.py`. User-facing rules: `docs/family-slant.html`.
+
+**Shipped behavior (do not regress):**
+
+- Group by nameID **16** then **1** (RIBBI-split weights stay one family).
+- Style pass: angles measurement-driven; italic/oblique bits name-driven.
+- Family review: recommend SET/CLEAR flags only; never rewrite angles.
+- Named Italic/Oblique present → unlabeled Romans stay upright for flag advice.
+- Roman-only families → skip SET from angle alone; CLEAR on upright still allowed.
+- Prompt: Apply all / Review each / Quit; skip for `-n` / `--validate-only` / non-TTY / no style.
+
 ## Do not lose
 
-- Handler **execution order** (OS/2 → style → glyph → kern → name) — documented as load-bearing.
+- Handler **execution order** (OS/2 → style → glyph → kern) — documented as load-bearing.
 - Corruption quarantine behavior (`_quarantine/`, `--no-quarantine`).
 - Parity with archived monolith until intentional behavior changes are changelog’d.
+- **v1.2.x / v1.3.x style split:** angles measurement-driven; italic/oblique bits name-driven in the style pass; family review is the only place that may recommend sibling-relative flag SET/CLEAR.

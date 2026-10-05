@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Family slant · FontFixer</title>
+  <meta name="description" content="Interactive family slant review — when it runs, how families group, and when flags are recommended." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="index.html">FontFixer <span>docs</span></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="handlers.html">Handlers</a>
+        <a href="family-slant.html" aria-current="page">Family slant</a>
+        <a href="flags.html">Flags</a>
+        <a href="safety.html">Safety</a>
+      </nav>
+      <a class="github-link" href="https://github.com/andrewsipe/FontFixer">GitHub</a>
+    </div>
+  </header>
+
+  <main>
+    <p class="meta">Post-pass · v1.3.2</p>
+    <h1>Family slant review</h1>
+    <p class="lede">
+      After the per-file handlers finish, FontFixer can compare measured italic angles <em>within each family</em> and recommend italic/oblique <strong>flag</strong> fixes when siblings disagree with the upright vs slanted picture. Angles are never rewritten here.
+    </p>
+
+    <div class="callout">
+      <strong>No new CLI flag.</strong> The review runs automatically after a normal interactive run that included the <code>style</code> handler. It is skipped for <code>-n</code>, <code>--validate-only</code>, non-TTY sessions, or when style was not run.
+    </div>
+
+    <h2>When it runs</h2>
+    <ol class="steps">
+      <li>Main pass completes (os2 → style → glyph → kern as selected).</li>
+      <li>Session is an interactive TTY (not piped / CI).</li>
+      <li><code>style</code> was among the handlers that ran.</li>
+      <li>Survey prints for every family in the run; only actionable families reach the prompt.</li>
+    </ol>
+
+    <h2>How families group</h2>
+    <p>Members are grouped by typographic family name:</p>
+    <ul>
+      <li><strong>nameID 16</strong> preferred (typographic family)</li>
+      <li>else <strong>nameID 1</strong> (legacy font family)</li>
+      <li>else a filename stem with trailing weight/width/slope tokens peeled off</li>
+    </ul>
+    <p>
+      Preferring ID 16 matters for RIBBI-split naming: weights like Black/Book/Light often put the weight in ID 1 (<code>Babel Black</code>) while ID 16 stays <code>Babel</code>. Using ID 1 first would treat each weight as its own one-cut family and skip them all as incomplete.
+    </p>
+
+    <h2>Style pass vs family review</h2>
+    <table>
+      <thead>
+        <tr><th></th><th>Style handler (per file)</th><th>Family slant review</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Angles / caret / CFF</td>
+          <td>Measurement-driven (multi-glyph median; named italics keep a non-zero angle if measurement is weak)</td>
+          <td>Not rewritten</td>
+        </tr>
+        <tr>
+          <td>Italic / oblique bits</td>
+          <td>Name labels only — measured slant does not mark a Roman as italic</td>
+          <td>May recommend SET/CLEAR when siblings show a clear upright vs slanted split</td>
+        </tr>
+        <tr>
+          <td>Prompt</td>
+          <td>None</td>
+          <td>Apply all / Review each / Quit</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Survey labels</h2>
+    <p>Each family gets one status row (FontCore semantic labels):</p>
+    <ul>
+      <li><span class="term">OK</span> — flags already match the family’s upright/slanted picture</li>
+      <li><span class="term">WARNING</span> — actionable: recommend SET and/or CLEAR italic (or oblique) bits</li>
+      <li><span class="term">SKIPPED</span> — no safe recommendation (see reasons below)</li>
+    </ul>
+
+    <h2>When a family is skipped</h2>
+    <table>
+      <thead>
+        <tr><th>Reason</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>incomplete family (only one cut)</td>
+          <td>Single member in this run — no sibling comparison</td>
+        </tr>
+        <tr>
+          <td>no upright reference</td>
+          <td>Every cut looks slanted by angle (often upright designs with noisy <code>italicAngle</code>)</td>
+        </tr>
+        <tr>
+          <td>no slanted cuts</td>
+          <td>All members look upright — nothing to compare</td>
+        </tr>
+        <tr>
+          <td>ambiguous spread</td>
+          <td>Upright vs slanted peaks differ by less than 2°</td>
+        </tr>
+        <tr>
+          <td>roman-only family</td>
+          <td>No named Italic/Oblique cuts — angle spread alone is not enough to <strong>SET</strong> italic (weight-correlated roman noise). Misplaced italic bits on the upright side can still be <strong>CLEAR</strong>ed</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Recommendation rules</h2>
+    <ul>
+      <li>Cluster members into upright vs slanted using measured angle (2° floor) and sibling context.</li>
+      <li>If the family already has named Italic/Oblique cuts, unlabeled Romans stay on the upright side — mild positive angles on Regular/Bold do not invent a third slant band.</li>
+      <li>Recommend <strong>CLEAR</strong> italic/oblique bits on the upright cluster when they are set.</li>
+      <li>Recommend <strong>SET</strong> italic (or oblique, when named) on the slanted cluster when bits are missing — <em>only</em> when the family has named Italic/Oblique anchors, or when clearing upright mismatches. Pure roman families do not get SET from angle alone.</li>
+      <li>Forward (negative) and backward (positive) slanted cuts both count as slanted; multi-band families keep flags on all slanted sides.</li>
+    </ul>
+
+    <h2>Prompt</h2>
+    <pre><code>1. Apply all recommended flag fixes
+2. Review each recommended family
+3. Quit (leave flags unchanged)</code></pre>
+    <p>Quit (or choosing skip while reviewing) leaves flags as the style pass left them. Nothing is applied silently.</p>
+
+    <div class="callout warn">
+      <strong>Still interactive.</strong> Uncommon naming can be intentional. Prefer Quit or Review each when the survey looks surprising; use <code>-o</code> on the main pass if you want tidied copies before accepting flag changes.
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a href="handlers.html">← Handlers</a>
+    · <a href="flags.html">Flags →</a>
+  </footer>
+</body>
+</html>
