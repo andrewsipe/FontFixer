@@ -5,6 +5,14 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-11-20
+
+### Fixed
+- The family-slant review fix path kept no timestamp: it opened fonts with the default and stamped the current time on save.
+- Fonts are opened with `recalcTimestamp=False`, so a save keeps the original `head.modified`
+  (fontTools otherwise stamps the current time on every save, even with no edits). A regression test fails
+  if a `TTFont()` open omits the flag.
+
 ## [1.3.3] - 2026-11-20
 
 ### Changed

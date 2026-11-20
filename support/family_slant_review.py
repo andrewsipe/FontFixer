@@ -497,7 +497,7 @@ def build_review_report(paths: Iterable[Path]) -> FamilyReviewReport:
 
 def apply_family_flag_fix(fix: FamilyFlagFix) -> bool:
     """Apply italic/oblique bit changes for one file. Returns True if saved."""
-    font = TTFont(fix.path)
+    font = TTFont(fix.path, recalcTimestamp=False)
     changed = False
     try:
         if "OS/2" not in font or "head" not in font:
