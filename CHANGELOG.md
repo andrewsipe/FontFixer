@@ -5,6 +5,14 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-11-20
+
+### Changed
+- Vendored FontCore refreshed to v0.2.0 (see `FontCore/VENDOR.md`). A filename
+  containing square brackets is no longer read as a console style tag.
+- The vendored copy is now produced by FontCore's `tools/vendor_fontcore.py`,
+  with the module list declared under `[tool.fontcore-vendor]` in `pyproject.toml`.
+
 ## [1.3.2] - 2026-10-05
 
 ### Added
