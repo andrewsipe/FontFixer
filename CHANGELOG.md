@@ -5,6 +5,11 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-11-21
+
+### Changed
+- Vendored FontCore refreshed to v0.3.0 (console wording and counts: "1 file" / "3 files", `Finished`, one `Proceed?`). No change to what the tool does to fonts.
+
 ## [1.3.4] - 2026-11-20
 
 ### Fixed
