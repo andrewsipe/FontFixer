@@ -10,14 +10,14 @@ Intended pipeline: naming cleanup ([FontNameID](https://github.com/andrewsipe/Fo
 
 ## Install
 
-Preferred: [pipx](https://pipx.pypa.io/):
+Preferred: [uv](https://docs.astral.sh/uv/):
 
 ```bash
-pipx install "git+https://github.com/andrewsipe/FontFixer.git"
-# later: pipx upgrade fontfixer
+uv tool install "git+https://github.com/andrewsipe/FontFixer.git"
+# later: uv tool upgrade fontfixer
 ```
 
-Or from a clone: `pipx install .` / `pip install -e .`
+From a clone: `uv tool install --editable .` (edits take effect immediately).
 
 The canonical command is **`fontfixer`**. On macOS a second `FontFixer` script is not shipped (case-insensitive collision); use `alias FontFixer=fontfixer` if you want the capital-F name.
 
