@@ -5,7 +5,9 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-11-21
+
+FontCore 0.4.0 vendored (see `FontCore/VENDOR.md`).
 
 ### Changed
 - An Oblique-named face now gets the ITALIC bit and macStyle italic as well as OBLIQUE (OS/2 v4+), the same flags `fontnameid` writes for its ID2 (Italic). Before, FontFixer cleared ITALIC on Oblique faces and the two tools undid each other. Family slant review follows the same rule.
