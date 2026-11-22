@@ -181,10 +181,12 @@ class FontStyleAnalyzer:
         name_oblique = self._name_implies_oblique()
         name_italic = self._name_implies_italic()
 
-        # Flags follow labels only — measured slant must not mark a Roman italic.
-        # Angle / caret remain honest to outline measurement elsewhere.
+        # Flags follow labels only — measured slant must not mark a Roman italic, and a slanted face
+        # named Regular stays Regular (Italic is a linked alternative to a Regular).
+        # Oblique is slanted too: it gets ITALIC as well as OBLIQUE, the same flags fontnameid writes for
+        # the face's ID2 (Italic). Angle / caret remain honest to outline measurement elsewhere.
         self._is_oblique = name_oblique
-        self._is_italic = name_italic and not name_oblique
+        self._is_italic = name_italic or name_oblique
 
         # Bold: intentional RIBBI link — weight 700 or the word "Bold" only.
         self._is_bold = False

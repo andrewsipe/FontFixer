@@ -319,9 +319,9 @@ def _desired_flags(member: FamilyMember) -> Tuple[bool, bool]:
     """Return (want_italic, want_oblique) for a clustered member."""
     if member.cluster == ClusterKind.UPRIGHT:
         return False, False
-    # Slanted: prefer oblique label when present, else italic.
+    # Slanted: an Oblique label gets OBLIQUE and ITALIC (ID2 is Italic for it); otherwise ITALIC.
     if member.name_oblique:
-        return False, True
+        return True, True
     return True, False
 
 
