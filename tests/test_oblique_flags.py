@@ -70,3 +70,13 @@ def test_an_italic_name_sets_italic_but_not_oblique(tmp_path):
 def test_a_slanted_font_named_regular_keeps_regular_flags(tmp_path):
     fs, mac = _fix(_font(tmp_path / "a.ttf", "Regular", angle=-9.0))
     assert not fs & FS_ITALIC and not mac & 2
+
+
+@pytest.mark.parametrize("leftover", ["Italic", "Bold Oblique"])
+def test_a_leftover_mac_record_does_not_set_italic(tmp_path, leftover):
+    path = _font(tmp_path / "a.ttf", "Regular")
+    f = TTFont(path, recalcTimestamp=False)
+    f["name"].setName(leftover, 4, 1, 0, 0)  # Mac full name, left over from an old tool
+    f.save(path)
+    fs, mac = _fix(path)
+    assert not fs & FS_ITALIC and not mac & 2

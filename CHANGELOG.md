@@ -5,6 +5,11 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Style flags no longer disagree with `fontnameid`. Found by running both tools in turn on 802 intake fonts: FontFixer set BOLD from `usWeightClass` 700 (so a Semibold or Ultrabold at 700 came back Bold), and read leftover Mac name records (a Mac `Semi Bold` or `Bold Italic` could set BOLD or ITALIC). Now BOLD follows the word Bold in the style (ID2 and ID17; the full name only when neither exists), and BOLD, ITALIC and OBLIQUE are read from the Windows English records unless the font has none. A second FontFixer pass after `fontnameid` changes nothing.
+
 ## [1.4.0] - 2026-11-21
 
 FontCore 0.4.0 vendored (see `FontCore/VENDOR.md`).

@@ -19,7 +19,6 @@ except ImportError:
     TTFont = None  # Type hint fallback
     StatisticsPen = None
 
-from .constants import WEIGHT_BOLD
 from .utilities import glyph_name_for_codepoint
 
 # Uppercase stems via Unicode; cmap resolves uniXXXX / custom names.
@@ -88,18 +87,28 @@ class FontStyleAnalyzer:
             self._analyze_style()
         return self._is_bold
 
-    def _style_name_strings(self) -> List[str]:
-        """Lowercased name-table strings used for style words."""
+    def _name_texts(self, name_ids) -> List[str]:
+        """Lowercased name strings for these IDs. Windows English records only when the font has them (as
+        fontnameid reads), so a leftover Mac record from an old tool cannot decide the style flags."""
         if "name" not in self.font:
             return []
-        names: List[str] = []
-        for record in self.font["name"].names:
-            if record.nameID in _NAME_IDS_STYLE:
-                try:
-                    names.append(record.toUnicode().lower())
-                except Exception:
-                    continue
-        return names
+        records = self.font["name"].names
+        windows_only = any(r.platformID == 3 and r.langID == 0x409 for r in records)
+        out: List[str] = []
+        for record in records:
+            if record.nameID not in name_ids:
+                continue
+            if windows_only and not (record.platformID == 3 and record.langID == 0x409):
+                continue
+            try:
+                out.append(record.toUnicode().lower())
+            except Exception:
+                continue
+        return out
+
+    def _style_name_strings(self) -> List[str]:
+        """Lowercased name-table strings used for style words."""
+        return self._name_texts(_NAME_IDS_STYLE)
 
     def _name_implies_oblique(self) -> bool:
         return any(re.search(r"\boblique\b", s) for s in self._style_name_strings())
@@ -188,19 +197,8 @@ class FontStyleAnalyzer:
         self._is_oblique = name_oblique
         self._is_italic = name_italic or name_oblique
 
-        # Bold: intentional RIBBI link — weight 700 or the word "Bold" only.
-        self._is_bold = False
-        if "OS/2" in self.font:
-            os2 = self.font["OS/2"]
-            if hasattr(os2, "usWeightClass") and os2.usWeightClass == WEIGHT_BOLD:
-                self._is_bold = True
-            elif "name" in self.font:
-                for record in self.font["name"].names:
-                    if record.nameID in _NAME_IDS_STYLE:
-                        try:
-                            name_str = record.toUnicode().lower()
-                        except Exception:
-                            continue
-                        if re.search(r"\bbold\b", name_str):
-                            self._is_bold = True
-                            break
+        # Bold: the word "Bold" in the style, nothing else. usWeightClass is not used (a Semibold is often 700
+        # too), matching fontnameid, so running one tool after the other does not flip the flags back.
+        # The style records are ID2 and ID17; the full name (ID4) is read only when neither exists.
+        texts = self._name_texts((2, 17)) or self._name_texts((4,))
+        self._is_bold = any(re.search(r"\bbold\b", t) for t in texts)
