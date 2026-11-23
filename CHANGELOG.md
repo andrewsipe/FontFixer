@@ -5,6 +5,11 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-11-22
+
+### Fixed
+- With `-j N` (or `-j 0`) the console output was out of order: each font's `UPDATED` lines were printed straight from the worker processes, so they appeared before the file's header, after it, or mixed with other fonts, and color codes were sometimes cut in half. Each worker now sends its output back with its result, and the parent prints one block per font: the `PARSING File n of N` header, what the handlers changed, then the result and where it was saved. Single-worker runs are unchanged. The blocks appear in the order the fonts finish, not the input order.
+
 ## [Unreleased]
 
 ### Changed

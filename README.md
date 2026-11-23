@@ -1,6 +1,6 @@
 # FontFixer
 
-**Version 1.4.1**
+**Version 1.4.2**
 
 Tidy OpenType fonts in a single pass — OS/2, style flags, glyphs, and legacy kern — without renaming or touching vertical metrics.
 

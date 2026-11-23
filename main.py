@@ -9,7 +9,10 @@ workflows with efficient batch processing.
 
 import sys
 import argparse
+import contextlib
+import io
 import multiprocessing as mp
+import os
 import traceback
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -392,14 +395,29 @@ def process_font_wrapper(args: Tuple[Path, ProcessingConfig]) -> Dict:
         enabled_handlers=config.enabled_handlers,
         quarantine_enabled=config.quarantine_enabled,
     )
-    result = fixer.fix_font(
-        font_path,
-        config.output_dir,
-        config.validate_only,
-        config.quarantine_dir,
-        config.input_root,
-    )
-    return result.to_dict()  # Convert to dict for multiprocessing compatibility
+    # Everything this font prints is captured and sent back with the result, so the parent can print it as one
+    # block under the font's own header. Printed straight from the workers, the lines of different fonts mix and
+    # escape sequences get cut in half.
+    captured = io.StringIO()
+    shared = cs.get_console()
+    previous_file = shared.file if shared is not None else None
+    if shared is not None:
+        shared.file = captured
+    try:
+        with contextlib.redirect_stdout(captured):
+            result = fixer.fix_font(
+                font_path,
+                config.output_dir,
+                config.validate_only,
+                config.quarantine_dir,
+                config.input_root,
+            )
+    finally:
+        if shared is not None:
+            shared.file = previous_file
+    data = result.to_dict()  # Convert to dict for multiprocessing compatibility
+    data["output"] = captured.getvalue()
+    return data
 
 
 def discover_and_validate_fonts(config: ProcessingConfig) -> list[Path]:
@@ -591,6 +609,12 @@ def _process_parallel(config: ProcessingConfig, font_paths: list[Path]) -> list[
 
     results = []
 
+    # Workers write into a buffer, not the terminal: give them the terminal's colors and width so the text
+    # they capture looks the same as text printed here.
+    if console is not None and console.is_terminal:
+        os.environ["FORCE_COLOR"] = "1"
+        os.environ["COLUMNS"] = str(console.width)
+
     with ProcessPoolExecutor(max_workers=config.num_workers) as executor:
         futures = {
             executor.submit(process_font_wrapper, item): item[0] for item in work_items
@@ -601,12 +625,18 @@ def _process_parallel(config: ProcessingConfig, font_paths: list[Path]) -> list[
             font_path = futures[future]
             try:
                 result = future.result()
+                worker_output = result.pop("output", "")
                 results.append(result)
 
                 completed += 1
+                # one block per font, in this order: header, what the handlers changed, the result
                 cs.StatusIndicator("parsing").add_message(
                     f"File {completed} of {len(font_paths)} |"
                 ).add_file(str(font_path), filename_only=True).emit(console)
+
+                if worker_output:
+                    sys.stdout.write(worker_output)
+                    sys.stdout.flush()
 
                 _display_result(result)
             except Exception as e:
