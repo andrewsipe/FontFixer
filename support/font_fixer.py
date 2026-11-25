@@ -56,6 +56,7 @@ class FontFixer:
         verbose: bool = False,
         enabled_handlers: Optional[list] = None,
         quarantine_enabled: bool = True,
+        quiet: bool = False,
     ):
         """
         Initialize font fixer.
@@ -64,7 +65,9 @@ class FontFixer:
             verbose: Enable verbose logging
             enabled_handlers: List of handler full names to run, None means all
             quarantine_enabled: Enable automatic quarantine of corrupted fonts
+            quiet: Print nothing per handler; the caller reports from the result
         """
+        self.quiet = quiet
         self.verbose = verbose
         # enabled_handlers is a list of handler names (HANDLER_OS2.full_name, etc.) to run, None means all
         self.enabled_handlers = enabled_handlers
@@ -118,7 +121,7 @@ class FontFixer:
         self, handler_name: str, changed: bool, changes: Dict = None
     ):
         """Log the result of a handler execution."""
-        if not changed:
+        if not changed or self.quiet:
             return  # Don't show unchanged handlers here - will show in consolidated message
 
         try:

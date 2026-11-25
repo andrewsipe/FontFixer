@@ -5,6 +5,15 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-11-25
+
+FontCore 0.8.0 vendored (`core_run_report` added).
+
+### Changed
+
+- Every font now prints as one block in the same order, sequential or `-j`: header, what changed, result. The worker no longer prints; the main process prints from the result, so the parallel path no longer captures output.
+- The closing line is one sentence: "Updated 2, unchanged 4, no problems."
+
 ## [1.4.3] - 2026-11-25
 
 FontCore 0.7.0 vendored (see `FontCore/VENDOR.md`).

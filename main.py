@@ -63,6 +63,7 @@ console = cs.get_console()
 
 # Import FontFixer modules (relative for installed package)
 from FontFixer.support.font_fixer import FontFixer
+from FontCore.core_run_report import FileReport, Line, RunReporter
 from FontFixer.support.data_models import (
     HandlerSpec,
     ALL_HANDLERS,
@@ -394,8 +395,9 @@ def process_font_wrapper(args: Tuple[Path, ProcessingConfig]) -> Dict:
         verbose=config.verbose,
         enabled_handlers=config.enabled_handlers,
         quarantine_enabled=config.quarantine_enabled,
+        quiet=True,
     )
-    # Everything this font prints is captured and sent back with the result, so the parent can print it as one
+    # Anything else it prints (verbose notes) is captured and sent back with the result, so the parent can print it as one
     # block under the font's own header. Printed straight from the workers, the lines of different fonts mix and
     # escape sequences get cut in half.
     captured = io.StringIO()
@@ -532,42 +534,39 @@ def _display_handler_list(config: ProcessingConfig):
     ).emit(console)
 
 
-def _display_result(result: Dict):
-    """Display result for a single font."""
-    if result["success"]:
-        # Show NO CHANGE message for unchanged handlers
-        if result.get("handlers_unchanged"):
-            unchanged_display = [
-                _handler_short_name(h)
-                for h in result["handlers_unchanged"]
-                if _get_handler_spec_by_full_name(h) is not None
-            ]
-            cs.StatusIndicator("unchanged").add_message(
-                f"Already compliant: {', '.join(unchanged_display)}"
-            ).emit(console)
+_reporter = RunReporter()
 
-        # Show SAVED status if file was modified
-        if result.get("was_modified") and result.get("output_path"):
-            cs.StatusIndicator("saved").add_file(
-                result["output_path"], filename_only=True
-            ).emit(console)
-    else:
-        # Show quarantine status if file was quarantined
+
+def _file_report(result: Dict, verbose: bool = False) -> FileReport:
+    """Turn one font's result into the facts the reporter prints."""
+    name = str(result.get("file", ""))
+    if not result.get("success"):
+        text = "; ".join(result.get("errors", []))
         if result.get("quarantined"):
-            cs.StatusIndicator("error").add_file(
-                result["file"], filename_only=True
-            ).with_explanation(
-                f"Quarantined: {result.get('quarantine_path', 'unknown')}; "
-                + "; ".join(result["errors"])
-            ).emit(console)
-        else:
-            cs.StatusIndicator("error").add_file(
-                result["file"], filename_only=True
-            ).with_explanation("; ".join(result["errors"])).emit(console)
+            text = f"Quarantined: {result.get('quarantine_path', 'unknown')}; " + text
+        return FileReport(name, "error", lines=[Line("error", file=name, explanation=text)])
+    builder = FontFixer(verbose=verbose, quiet=True)
+    changes = [
+        (handler, builder._build_fix_details_from_changes(props))
+        for handler, props in (result.get("changes") or {}).items()
+    ]
+    lines = []
+    unchanged = [
+        _handler_short_name(h)
+        for h in result.get("handlers_unchanged") or []
+        if _get_handler_spec_by_full_name(h) is not None
+    ]
+    if unchanged:
+        lines.append(Line("unchanged", f"Already compliant: {', '.join(unchanged)}"))
+    if result.get("was_modified") and result.get("output_path"):
+        lines.append(Line("saved", file=str(result["output_path"])))
+    outcome = "updated" if result.get("was_modified") else "unchanged"
+    return FileReport(name, outcome, changes=changes, lines=lines)
 
 
 def process_all_fonts(config: ProcessingConfig, font_paths: list[Path]) -> list[Dict]:
     """Process all fonts (sequential or parallel)."""
+    _reporter.total = len(font_paths)
     if config.num_workers == 1:
         return _process_sequential(config, font_paths)
     else:
@@ -579,9 +578,7 @@ def _process_sequential(config: ProcessingConfig, font_paths: list[Path]) -> lis
     results = []
 
     for idx, font_path in enumerate(font_paths, 1):
-        cs.StatusIndicator("parsing").add_message(
-            f"File {idx} of {len(font_paths)} |"
-        ).add_file(str(font_path), filename_only=True).emit(console)
+        _reporter.header(idx, str(font_path))
 
         _display_handler_list(config)
 
@@ -589,6 +586,7 @@ def _process_sequential(config: ProcessingConfig, font_paths: list[Path]) -> lis
             verbose=config.verbose,
             enabled_handlers=config.enabled_handlers,
             quarantine_enabled=config.quarantine_enabled,
+            quiet=True,
         )
 
         result = fixer.fix_font(
@@ -601,7 +599,7 @@ def _process_sequential(config: ProcessingConfig, font_paths: list[Path]) -> lis
 
         result_dict = result.to_dict()  # Convert for display and storage
         results.append(result_dict)
-        _display_result(result_dict)
+        _reporter.body(_file_report(result_dict, config.verbose))
 
     return results
 
@@ -633,22 +631,17 @@ def _process_parallel(config: ProcessingConfig, font_paths: list[Path]) -> list[
 
                 completed += 1
                 # one block per font, in this order: header, what the handlers changed, the result
-                cs.StatusIndicator("parsing").add_message(
-                    f"File {completed} of {len(font_paths)} |"
-                ).add_file(str(font_path), filename_only=True).emit(console)
-
+                _reporter.header(completed, str(font_path))
                 if worker_output:
                     sys.stdout.write(worker_output)
                     sys.stdout.flush()
-
-                _display_result(result)
+                _reporter.body(_file_report(result, config.verbose))
             except Exception as e:
                 error_msg = f"{str(font_path)}: {type(e).__name__}: {str(e)}"
                 if config.verbose:
                     error_msg = f"{error_msg}\n{traceback.format_exc()}"
-                cs.StatusIndicator("error").add_file(
-                    str(font_path), filename_only=True
-                ).with_explanation(error_msg).emit(console)
+                _reporter.header(len(results) + 1, str(font_path))
+                _reporter.body(FileReport(str(font_path), "error", lines=[Line("error", file=str(font_path), explanation=error_msg)]))
                 results.append(
                     {
                         "file": str(font_path),
@@ -664,13 +657,7 @@ def display_summary(config: ProcessingConfig, results: list[Dict]):
     """Display processing summary."""
     stats = _calculate_statistics(results)
 
-    cs.fmt_processing_summary(
-        dry_run=False,
-        updated=stats.updated,
-        unchanged=stats.unchanged,
-        errors=stats.failed,
-        console=console,
-    )
+    _reporter.summary()
 
     # Show quarantined count if any files were quarantined
     if stats.quarantined > 0 and config.quarantine_dir:
