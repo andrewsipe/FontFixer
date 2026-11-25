@@ -5,6 +5,13 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-11-25
+
+FontCore 0.7.0 vendored (see `FontCore/VENDOR.md`).
+
+### Changed
+- File collection follows one set of rules: macOS junk (`._*`, `__MACOSX`) and hidden files and folders are skipped, each real file is listed once (a symlink and its target are one file), and a path that does not exist gets a warning. Binary formats are the default; this tool asks for TTX where it handles it. FontFixer reads binary fonts only (it never opened TTX).
+
 ## [1.4.2] - 2026-11-22
 
 ### Fixed

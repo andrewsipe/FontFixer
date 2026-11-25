@@ -422,7 +422,10 @@ def process_font_wrapper(args: Tuple[Path, ProcessingConfig]) -> Dict:
 
 def discover_and_validate_fonts(config: ProcessingConfig) -> list[Path]:
     """Find all font files to process."""
-    font_files = collect_font_files([config.input_path], config.recursive)
+    missing: list = []
+    font_files = collect_font_files([config.input_path], config.recursive, on_missing=missing.append)
+    for path in missing:
+        cs.StatusIndicator("warning").add_message(f"Path not found: {path}").emit(console)
     font_paths = [Path(f) for f in font_files]
 
     if not font_paths:
