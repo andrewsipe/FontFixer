@@ -3,7 +3,7 @@
 fontfixer ships a minimal copy of [FontCore](https://github.com/andrewsipe/FontCore)
 so it installs without the full library, a submodule, or a symlink.
 
-**Source:** FontCore 0.8.0 (`v0.8.0`)
+**Source:** FontCore 0.11.4 (`v0.11.4`)
 
 **Do not edit these files here.** Fix them in FontCore, then re-sync.
 
@@ -14,6 +14,7 @@ so it installs without the full library, a submodule, or a symlink.
 - `core_file_collector.py`
 - `core_logging_config.py`
 - `core_run_report.py`
+- `core_variable_traits.py`
 
 ## Refresh
 

@@ -5,6 +5,13 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-11-26
+
+FontCore 0.11.4 vendored (see `FontCore/VENDOR.md`).
+
+### Fixed
+- An italic variable font whose names do not say Italic keeps its italic flags: for a variable font the style flags follow the tables' slope decision (fvar, STAT, the italic bits, the names, the instances), not the names alone. A font with no free axes still follows its names.
+
 ## [1.5.1] - 2026-11-25
 
 ### Fixed

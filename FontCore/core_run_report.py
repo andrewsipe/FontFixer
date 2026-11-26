@@ -80,6 +80,8 @@ class RunReporter:
     # ---- the end of the run ------------------------------------------------------------------------------
     def sentence(self) -> str:
         c, v = self.counts, self.verbs
+        if v == DEFAULT_VERBS:
+            return cs.fmt_run_sentence(c["updated"], c["unchanged"], c["error"], c["skipped"])
         parts = [f"{v['updated']} {c['updated']}", f"{v['unchanged']} {c['unchanged']}"]
         if c["skipped"]:
             parts.append(f"{v['skipped']} {c['skipped']}")

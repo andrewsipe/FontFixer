@@ -208,6 +208,20 @@ class FontStyleAnalyzer:
         self._is_oblique = name_oblique
         self._is_italic = name_italic or name_oblique
 
+        # A variable font's slope comes from its tables (fvar, STAT, the italic bits, the names and the instances
+        # vote), not from the names alone: an italic variable font named "Regular" keeps its italic flags
+        # (FontCore DECISIONS.md, Area 5). A font with no free axes is static in effect and follows its names.
+        if "fvar" in self.font:
+            try:
+                from FontCore.core_variable_traits import analyze_variable_traits
+
+                traits = analyze_variable_traits(self.font)
+                if traits.is_variable and not traits.no_free_axes:
+                    self._is_italic = traits.slope == "italic"
+                    self._is_oblique = bool(traits.slope_word) and traits.slope_word.lower() == "oblique"
+            except Exception:
+                pass  # keep the name-based answer
+
         # Bold: the word "Bold" in the style, nothing else. usWeightClass is not used (a Semibold is often 700
         # too), matching fontnameid, so running one tool after the other does not flip the flags back.
         # The style records are ID2 and ID17; the full name (ID4) is read only when neither exists.
