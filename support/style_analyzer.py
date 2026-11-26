@@ -21,12 +21,13 @@ except ImportError:
 
 from .utilities import glyph_name_for_codepoint
 
-# Uppercase stems via Unicode; cmap resolves uniXXXX / custom names.
+# Uppercase vertical stems via Unicode; cmap resolves uniXXXX / custom names.
 # Lowercase is skipped: StatisticsPen often reports the wrong sign on italic lc.
+# N is skipped too: its diagonal leans left even in an upright font, and once H and I read under the
+# floor it was the only sample left, so upright fonts got a positive angle of several degrees.
 _SLANT_CODEPOINTS: Sequence[int] = (
     0x0048,  # H
     0x0049,  # I
-    0x004E,  # N
 )
 
 _SLANT_NAME_FALLBACKS: Sequence[str] = (
@@ -34,8 +35,6 @@ _SLANT_NAME_FALLBACKS: Sequence[str] = (
     "uni0048",
     "I",
     "uni0049",
-    "N",
-    "uni004E",
 )
 
 _NAME_IDS_STYLE = (1, 2, 4, 6, 16, 17)
@@ -170,6 +169,18 @@ class FontStyleAnalyzer:
                 samples = neg
             elif len(pos) > len(neg):
                 samples = pos
+            if len(samples) > 1 and max(samples) - min(samples) > 2.0:
+                # H and I disagree: their average is an angle neither glyph has. Keep the one the font already
+                # agrees with; with no stored angle, H (the first sample) decides.
+                stored = 0.0
+                if "post" in self.font:
+                    try:
+                        stored = float(self.font["post"].italicAngle or 0.0)
+                    except (TypeError, ValueError):
+                        stored = 0.0
+                if abs(stored) >= 0.1:
+                    return round(min(samples, key=lambda a: abs(a - stored)), 2)
+                return round(samples[0], 2)
             return round(float(median(samples)), 2)
 
         # Measurement failed or stayed under the floor — do not zero out a

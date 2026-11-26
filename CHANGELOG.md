@@ -5,6 +5,14 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-11-25
+
+### Fixed
+
+- Upright fonts no longer get a positive `post.italicAngle` (and caret slope) of several degrees. The slant was sampled on `H`, `I` and `N`; in an upright font `H` and `I` read 0 and fell under the 2 degree floor, leaving the diagonal of `N` as the only sample. `N` is no longer sampled.
+- When `H` and `I` disagree by more than 2 degrees, the angle nearest the one already stored wins (with none stored, `H`), instead of the average of the two, which neither glyph has.
+- Re-running FontFixer on a font written with the wrong angle resets it to 0.
+
 ## [1.5.0] - 2026-11-25
 
 FontCore 0.8.0 vendored (`core_run_report` added).
