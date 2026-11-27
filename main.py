@@ -63,6 +63,7 @@ console = cs.get_console()
 
 # Import FontFixer modules (relative for installed package)
 from FontFixer.support.font_fixer import FontFixer
+from FontFixer.support.utilities import capture_fonttools_warnings
 from FontCore.core_run_report import FileReport, Line, RunReporter
 from FontFixer.support.data_models import (
     HandlerSpec,
@@ -406,7 +407,7 @@ def process_font_wrapper(args: Tuple[Path, ProcessingConfig]) -> Dict:
     if shared is not None:
         shared.file = captured
     try:
-        with contextlib.redirect_stdout(captured):
+        with contextlib.redirect_stdout(captured), capture_fonttools_warnings() as warnings:
             result = fixer.fix_font(
                 font_path,
                 config.output_dir,
@@ -419,6 +420,7 @@ def process_font_wrapper(args: Tuple[Path, ProcessingConfig]) -> Dict:
             shared.file = previous_file
     data = result.to_dict()  # Convert to dict for multiprocessing compatibility
     data["output"] = captured.getvalue()
+    data["fonttools_warnings"] = warnings
     return data
 
 
@@ -544,7 +546,8 @@ def _file_report(result: Dict, verbose: bool = False) -> FileReport:
         text = "; ".join(result.get("errors", []))
         if result.get("quarantined"):
             text = f"Quarantined: {result.get('quarantine_path', 'unknown')}; " + text
-        return FileReport(name, "error", lines=[Line("error", file=name, explanation=text)])
+        warned = [Line("warning", f"{w} (reported by fontTools while reading this font)") for w in result.get("fonttools_warnings") or []]
+        return FileReport(name, "error", lines=warned + [Line("error", file=name, explanation=text)])
     builder = FontFixer(verbose=verbose, quiet=True)
     changes = [
         (handler, builder._build_fix_details_from_changes(props))
@@ -556,6 +559,8 @@ def _file_report(result: Dict, verbose: bool = False) -> FileReport:
         for h in result.get("handlers_unchanged") or []
         if _get_handler_spec_by_full_name(h) is not None
     ]
+    for text in result.get("fonttools_warnings") or []:
+        lines.append(Line("warning", f"{text} (reported by fontTools while reading this font)"))
     if unchanged:
         lines.append(Line("unchanged", f"Already compliant: {', '.join(unchanged)}"))
     if result.get("was_modified") and result.get("output_path"):
@@ -589,15 +594,17 @@ def _process_sequential(config: ProcessingConfig, font_paths: list[Path]) -> lis
             quiet=True,
         )
 
-        result = fixer.fix_font(
-            font_path,
-            config.output_dir,
-            config.validate_only,
-            config.quarantine_dir,
-            config.input_root,
-        )
+        with capture_fonttools_warnings() as warnings:
+            result = fixer.fix_font(
+                font_path,
+                config.output_dir,
+                config.validate_only,
+                config.quarantine_dir,
+                config.input_root,
+            )
 
         result_dict = result.to_dict()  # Convert for display and storage
+        result_dict["fonttools_warnings"] = warnings
         results.append(result_dict)
         _reporter.body(_file_report(result_dict, config.verbose))
 

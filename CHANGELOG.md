@@ -5,6 +5,11 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-11-27
+
+### Changed
+- A warning fontTools writes while it reads a font (an unsorted Coverage, a huge advance height) now prints as a `WARNING` line under that font's own block. It used to print where the worker read the font, which with parallel workers was a few files away from the one it was about.
+
 ## [1.7.0] - 2026-11-27
 
 ### Added

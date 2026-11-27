@@ -6,6 +6,8 @@ This module contains pure utility functions used throughout the FontFixer tool.
 
 from __future__ import annotations
 
+import contextlib
+import logging
 from typing import Iterable, Optional, Sequence
 
 try:
@@ -101,6 +103,35 @@ def gpos_has_kerning(font: TTFont) -> bool:
             return True
 
     return False
+
+
+
+@contextlib.contextmanager
+def capture_fonttools_warnings():
+    """Collect what fontTools logs while a font is read and processed, instead of letting it print to the terminal.
+
+    fontTools writes these lines itself, as the font is read, so with several fonts in flight they appear next to
+    the wrong file. Yields a list that fills with each distinct message, with a count when one repeats.
+    """
+    messages: dict = {}
+
+    class _Collect(logging.Handler):
+        def emit(self, record):
+            if record.levelno >= logging.WARNING:
+                text = record.getMessage()
+                messages[text] = messages.get(text, 0) + 1
+
+    logger = logging.getLogger("fontTools")
+    handler, propagate = _Collect(), logger.propagate
+    logger.addHandler(handler)
+    logger.propagate = False
+    collected: list = []
+    try:
+        yield collected
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = propagate
+        collected.extend(text if n == 1 else f"{text} (x{n})" for text, n in messages.items())
 
 
 _RIBBI = {"regular": (False, False), "italic": (False, True), "bold": (True, False), "bold italic": (True, True)}
