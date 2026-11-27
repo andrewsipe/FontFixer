@@ -5,6 +5,16 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-11-27
+
+FontCore 0.11.9 vendored (see `FontCore/VENDOR.md`).
+
+### Fixed
+- nameID 2 (Regular / Italic / Bold / Bold Italic) follows the italic flags when FontFixer changes them, in the style pass and in the family slant review. Before, the flags were corrected and ID2 kept the old value until fontnameid ran.
+- The family slant review no longer reads the `Upright Italic` marker (the ID17 of a font with a free slope) as an italic name, so free-slope fonts such as `FL_ScienceSans*-Variable` are not told to set italic flags at an angle of 0. The filename now counts as a name cue (`BT_Circuit-VariableItalic`).
+- A variable font whose `ital` axis never reaches upright (BT_Circuit, Costaline) is read as Italic, so the style pass sets its italic flags.
+- The filename's own slope word (`QualionNeue-VariableOblique`) keeps the Oblique bit; the style pass used to clear it and the review set it again on every run.
+
 ## [1.6.0] - 2026-11-26
 
 FontCore 0.11.4 vendored (see `FontCore/VENDOR.md`).

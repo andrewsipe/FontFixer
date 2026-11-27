@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import re
+from pathlib import Path
 from statistics import median
 from typing import Iterable, List, Optional, Sequence
 
@@ -215,7 +216,8 @@ class FontStyleAnalyzer:
             try:
                 from FontCore.core_variable_traits import analyze_variable_traits
 
-                traits = analyze_variable_traits(self.font)
+                path = getattr(getattr(getattr(self.font, "reader", None), "file", None), "name", None)
+                traits = analyze_variable_traits(self.font, Path(path).stem if path else None)
                 if traits.is_variable and not traits.no_free_axes:
                     self._is_italic = traits.slope == "italic"
                     self._is_oblique = bool(traits.slope_word) and traits.slope_word.lower() == "oblique"

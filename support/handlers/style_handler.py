@@ -19,7 +19,7 @@ from .base_handler import TableHandler
 from ..data_models import HANDLER_STYLE
 from ..style_analyzer import FontStyleAnalyzer
 from ..bitfield import FS_SELECTION, MAC_STYLE
-from ..utilities import clamp_signed_16bit
+from ..utilities import clamp_signed_16bit, sync_style_link_name
 from ..constants import SIGNED_16BIT_MIN, SIGNED_16BIT_MAX
 from ..decorators import conditional_fix
 
@@ -300,6 +300,14 @@ class StyleConsistencyHandler(TableHandler):
         any_changed = self._track_style_flag_changes(
             original_fs, os2.fsSelection, original_mac, head.macStyle
         )
+
+        # nameID 2 (Regular / Italic / Bold / Bold Italic) says the same thing as the flags just written
+        if any_changed:
+            sync_style_link_name(
+                self.font,
+                bold=FS_SELECTION.flags["BOLD"].is_set(os2.fsSelection),
+                italic=FS_SELECTION.flags["ITALIC"].is_set(os2.fsSelection),
+            )
 
         return any_changed
 

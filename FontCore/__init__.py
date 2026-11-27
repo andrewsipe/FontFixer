@@ -1,4 +1,4 @@
 """Vendored FontCore subset used by fontfixer. Managed by tools/vendor_fontcore.py."""
 
-__fontcore_version__ = "0.11.4"
-__fontcore_source__ = "v0.11.4"
+__fontcore_version__ = "0.11.9"
+__fontcore_source__ = "v0.11.6-3-gf815e0a"

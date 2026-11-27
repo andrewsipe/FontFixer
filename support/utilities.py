@@ -101,3 +101,26 @@ def gpos_has_kerning(font: TTFont) -> bool:
             return True
 
     return False
+
+
+_RIBBI = {"regular": (False, False), "italic": (False, True), "bold": (True, False), "bold italic": (True, True)}
+
+
+def sync_style_link_name(font: TTFont, *, bold: bool, italic: bool) -> bool:
+    """Make nameID 2 (Regular / Italic / Bold / Bold Italic) agree with the flags just written. A name that is not one of
+    those four (a style the designer wrote out) is left alone."""
+    if "name" not in font:
+        return False
+    want = ("Bold Italic" if italic else "Bold") if bold else ("Italic" if italic else "Regular")
+    changed = False
+    for record in font["name"].names:
+        if record.nameID != 2:
+            continue
+        try:
+            current = record.toUnicode().strip()
+        except Exception:
+            continue
+        if current.lower() in _RIBBI and current != want:
+            record.string = want
+            changed = True
+    return changed

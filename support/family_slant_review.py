@@ -27,6 +27,7 @@ except ImportError:
 from .bitfield import FS_SELECTION, MAC_STYLE
 from .data_models import HANDLER_STYLE
 from .style_analyzer import FontStyleAnalyzer
+from .utilities import sync_style_link_name
 
 try:
     import FontCore.core_console_styles as cs
@@ -193,12 +194,23 @@ def _name_blob(font: TTFont) -> str:
     return " ".join(parts)
 
 
-def _name_has_italic(font: TTFont) -> bool:
-    return bool(_ITALIC_RE.search(_name_blob(font)))
+_FREE_SLOPE_RE = re.compile(r"\bupright\s+italic\b", re.I)  # ID17 of a font whose slope is free: says neither
 
 
-def _name_has_oblique(font: TTFont) -> bool:
-    return bool(_OBLIQUE_RE.search(_name_blob(font)))
+def _name_text(font: TTFont, path: Optional[Path]) -> str:
+    """The names that label a cut's slope: the name records (minus the free-slope marker) and the filename."""
+    text = _FREE_SLOPE_RE.sub(" ", _name_blob(font))
+    return f"{text} {path.stem}" if path is not None else text
+
+
+def _name_has_italic(font: TTFont, path: Optional[Path] = None) -> bool:
+    text = _name_text(font, path)
+    return bool(_ITALIC_RE.search(text) or (path is not None and re.search("italic", path.stem, re.I)))
+
+
+def _name_has_oblique(font: TTFont, path: Optional[Path] = None) -> bool:
+    text = _name_text(font, path)
+    return bool(_OBLIQUE_RE.search(text) or (path is not None and re.search("oblique", path.stem, re.I)))
 
 
 def load_family_member(path: Path) -> Optional[FamilyMember]:
@@ -224,8 +236,8 @@ def load_family_member(path: Path) -> Optional[FamilyMember]:
             family_key=family_key_for_font(font, Path(path)),
             style_label=style_label_for_font(font, Path(path)),
             measured_angle=angle,
-            name_italic=_name_has_italic(font),
-            name_oblique=_name_has_oblique(font),
+            name_italic=_name_has_italic(font, Path(path)),
+            name_oblique=_name_has_oblique(font, Path(path)),
             fs_italic=FS_SELECTION.flags["ITALIC"].is_set(fs),
             fs_oblique=fs_oblique,
             mac_italic=MAC_STYLE.flags["ITALIC"].is_set(mac),
@@ -533,6 +545,8 @@ def apply_family_flag_fix(fix: FamilyFlagFix) -> bool:
             changed = True
         if mac != old_mac:
             head.macStyle = mac
+            changed = True
+        if sync_style_link_name(font, bold=FS_SELECTION.flags["BOLD"].is_set(fs), italic=bool(fix.set_italic or fix.set_oblique)):
             changed = True
 
         if changed:
