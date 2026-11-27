@@ -206,7 +206,7 @@ class ProcessingConfig:
 HANDLER_BLURBS = {
     "os2": "upgrade OS/2 to v4; installable embedding; monospace; USE_TYPO_METRICS",
     "style": "sync italic/bold angles and flags across post, hhea, OS/2, head, CFF (after os2)",
-    "glyph": "ensure .notdef is drawn; ensure nbsp (U+00A0) matches space width",
+    "glyph": "ensure .notdef is drawn; ensure nbsp (U+00A0) matches space width; repair advances stored as overflow",
     "kern": "remove legacy kern table when GPOS kern/vkrn is present",
 }
 

@@ -49,7 +49,7 @@ HANDLER_STYLE = HandlerSpec(
 HANDLER_GLYPH = HandlerSpec(
     "glyf/CFF + cmap + hmtx (glyphs)",
     "glyph",
-    "Ensure .notdef is drawn; ensure nbsp (U+00A0) matches space width",
+    "Ensure .notdef is drawn; ensure nbsp (U+00A0) matches space width; repair advances stored as overflow",
 )
 HANDLER_KERN = HandlerSpec(
     "kern+GPOS (kerning)",

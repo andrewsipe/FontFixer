@@ -24,6 +24,7 @@ class GlyphHandler(TableHandler):
     Responsibilities:
     - .notdef glyph presence and structure
     - nbsp (U+00A0) presence and metrics
+    - advance widths and heights stored as unsigned overflow (a negative value read back as 63100)
     """
 
     def get_table_name(self) -> str:
@@ -37,7 +38,32 @@ class GlyphHandler(TableHandler):
         self.validate_condition(
             "nbsp_present", lambda: self._validate_nbsp_helper(), "nbsp validation"
         )
+        self.validate_condition(
+            "advances_valid", lambda: self._validate_advances_helper(), "advance validation"
+        )
         return self.validations
+
+    # An advance is stored as an unsigned 16-bit number, so a negative value comes back as 65536 minus it. Anything
+    # above 32767 is that overflow: a real advance that wide is never intended.
+    _ADVANCE_OVERFLOW = 32767
+
+    def _overflowed_advances(self) -> Dict[str, Dict[str, int]]:
+        """{'hmtx': {glyph: advance}, 'vmtx': {...}} for the advances above the overflow limit."""
+        found: Dict[str, Dict[str, int]] = {}
+        for tag in ("hmtx", "vmtx"):
+            if tag in self.font:
+                bad = {g: adv for g, (adv, _side) in self.font[tag].metrics.items() if adv > self._ADVANCE_OVERFLOW}
+                if bad:
+                    found[tag] = bad
+        return found
+
+    def _validate_advances_helper(self) -> Tuple[bool, str]:
+        found = self._overflowed_advances()
+        count = sum(len(v) for v in found.values())
+        return (
+            count == 0,
+            f"Status: {count} overflowed advance(s), Compliant: {count == 0}",
+        )
 
     def _validate_notdef_helper(self) -> Tuple[bool, str]:
         """Helper: check if .notdef is valid."""
@@ -109,6 +135,10 @@ class GlyphHandler(TableHandler):
         """Fix glyph issues."""
         any_changed = False
 
+        # first, so a space that overflowed is repaired before nbsp is matched to it
+        if not self.validations.get("advances_valid", {}).get("valid", True):
+            any_changed |= self._fix_advances()
+
         if not self.validations.get("notdef_valid", {}).get("valid", True):
             any_changed |= self._fix_notdef()
 
@@ -119,6 +149,30 @@ class GlyphHandler(TableHandler):
             any_changed |= self._fix_nbsp_width()
 
         return any_changed
+
+    def _fix_advances(self) -> bool:
+        """Give each overflowed advance the font's own typical value: the most common height for vmtx, for hmtx the
+        space width on a space glyph (nbsp and space mirror each other) and the median width on any other glyph."""
+        changed = False
+        for tag, bad in self._overflowed_advances().items():
+            metrics = self.font[tag].metrics
+            valid = sorted(adv for adv, _ in metrics.values() if 0 < adv <= self._ADVANCE_OVERFLOW)
+            if not valid:
+                continue
+            if tag == "vmtx":
+                typical = max(set(valid), key=valid.count)
+            else:
+                typical = valid[len(valid) // 2]
+            cmap = self.font.getBestCmap() or {}
+            space_names = {cmap.get(0x20), cmap.get(0xA0)} - {None}
+            sibling = [metrics[g][0] for g in space_names if g in metrics and g not in bad]
+            label = "width" if tag == "hmtx" else "height"
+            for glyph, old in bad.items():
+                new = sibling[0] if (tag == "hmtx" and glyph in space_names and sibling) else typical
+                metrics[glyph] = (new, metrics[glyph][1])
+                self.track_changes().add(f"{glyph}_advance_{label}", old, new).commit()
+                changed = True
+        return changed
 
     def _fix_notdef(self) -> bool:
         """Create .notdef glyph if empty."""

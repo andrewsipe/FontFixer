@@ -5,6 +5,11 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-11-27
+
+### Added
+- The glyph pass repairs an advance width or height stored as unsigned overflow: a negative value read back as 63100, which fontTools reports as a "huge advance height". An advance above 32767 is never intended. A height gets the font's most common height, a space width gets the nbsp width (and the reverse), and any other width gets the font's median width. Side bearings are kept. This replaces the stand-alone advance-width script.
+
 ## [1.6.1] - 2026-11-27
 
 FontCore 0.11.9 vendored (see `FontCore/VENDOR.md`).
