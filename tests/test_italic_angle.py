@@ -120,3 +120,9 @@ def test_an_italic_with_nothing_measurable_keeps_its_stored_angle():
     f = font(glyphs=("N",), style="Italic")
     f["post"].italicAngle = -9.0
     assert angle(f) == pytest.approx(-9.0, abs=0.1)
+
+
+def test_an_italic_named_font_with_a_right_leaning_angle_and_unmeasurable_upright_stems_keeps_its_angle():
+    f = font(style="Italic")  # stems read upright, like a stair-stepped pixel italic
+    f["post"].italicAngle = -15.0
+    assert angle(f) == pytest.approx(-15.0, abs=0.1)
