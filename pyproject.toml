@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fontfixer"
-version = "1.7.1"
+version = "1.7.2"
 description = "Simple OpenType tidy-up (OS/2, style, glyphs, kern) in a single pass"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -29,4 +29,4 @@ packages = ["FontFixer", "FontFixer.support", "FontFixer.support.handlers", "Fon
 "FontCore" = "FontCore"
 
 [tool.fontcore-vendor]
-modules = ["core_console_config", "core_console_styles", "core_file_collector", "core_logging_config", "core_run_report", "core_variable_traits"]
+modules = ["core_console_config", "core_console_styles", "core_file_collector", "core_logging_config", "core_run_report", "core_slant_measure", "core_variable_traits"]

@@ -184,8 +184,14 @@ class FontStyleAnalyzer:
                 return round(samples[0], 2)
             return round(float(median(samples)), 2)
 
-        # Measurement failed or stayed under the floor — do not zero out a
-        # named italic/oblique that already carries a post angle.
+        # Measurement failed or stayed under the floor. Names can be stale (an Upright file that was named Italic keeps its
+        # wrong angle forever), so the outlines get the last word, but only when they positively read upright: the stems
+        # of H, I, l, E and the rest lean under half a degree (stricter than FontCore's 1, since this zeroes a stored angle). A font with no straight stems cannot be measured, and an
+        # italic named as one keeps its stored angle (below).
+        if self._outlines_read_upright():
+            return 0.0
+
+        # Do not zero out a named italic/oblique that already carries a post angle.
         if self._name_implies_italic() or self._name_implies_oblique():
             if "post" in self.font:
                 try:
@@ -196,6 +202,16 @@ class FontStyleAnalyzer:
                     return round(post_angle, 2)
 
         return 0.0
+
+    def _outlines_read_upright(self) -> bool:
+        """True only when the stem outlines are measurable and upright (FontCore.core_slant_measure)."""
+        try:
+            from FontCore.core_slant_measure import check_slant
+
+            check = check_slant(self.font)
+        except Exception:
+            return False
+        return check.measured is not None and check.verdict != "unmeasurable" and abs(check.measured) < 0.5
 
     def _analyze_style(self):
         """Analyze style flags from names; angle stays measurement-driven."""

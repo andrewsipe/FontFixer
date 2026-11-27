@@ -100,3 +100,23 @@ def test_when_h_and_i_disagree_the_one_nearest_the_stored_angle_wins():
 
 def test_when_h_and_i_disagree_and_nothing_is_stored_h_wins():
     assert angle(disagreeing(stored=0.0)) == pytest.approx(-12.0, abs=0.6)
+
+
+# ---- stale Italic names on an upright outline: the outlines decide -----------------------------------------
+
+def test_an_upright_outline_with_stale_italic_names_loses_its_wrong_stored_angle():
+    f = font(style="Italic")
+    f["post"].italicAngle = 11.93
+    assert angle(f) == 0.0
+
+
+def test_a_real_italic_keeps_its_angle_when_the_names_say_italic():
+    f = font(shear_degrees=9.0, style="Italic")
+    f["post"].italicAngle = -9.0
+    assert angle(f) == pytest.approx(-9.0, abs=0.6)
+
+
+def test_an_italic_with_nothing_measurable_keeps_its_stored_angle():
+    f = font(glyphs=("N",), style="Italic")
+    f["post"].italicAngle = -9.0
+    assert angle(f) == pytest.approx(-9.0, abs=0.1)
