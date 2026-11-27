@@ -1,4 +1,4 @@
 """FontFixer - Modular font validation and correction tool."""
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 __all__ = []
