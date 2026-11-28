@@ -163,6 +163,9 @@ class FontStyleAnalyzer:
         # Stair-stepped and pixel italics fail the shape test, so they fall through; so does a font with no straight stems.
         if self._outlines_read_upright():
             return 0.0
+        flipped = self._outlines_say_sign_flipped()
+        if flipped is not None:
+            return flipped
 
         samples: List[float] = []
         for glyph_name in self._iter_slant_glyph_names():
@@ -204,6 +207,26 @@ class FontStyleAnalyzer:
                     return round(post_angle, 2)
 
         return 0.0
+
+    def _outlines_say_sign_flipped(self) -> Optional[float]:
+        """The measured angle when the stored one is the same lean with the wrong sign and two measures agree on it.
+
+        FontCore's check says sign-flipped when the stem edges lean the opposite way from post.italicAngle by about the
+        same amount. It is written only when the whole letter shapes lean the same way as the edges, by at least half as
+        much. Where they disagree (a script whose edges lean but whose letters do not, or a 3 degree lean the other way)
+        the stored angle stays and the font is only a flag in check_slant."""
+        try:
+            from FontCore.core_slant_measure import check_slant, shape_slant
+
+            check = check_slant(self.font)
+            if check.verdict != "sign-flipped" or check.measured is None:
+                return None
+            shape = shape_slant(self.font)
+        except Exception:
+            return None
+        if shape is None or shape * check.measured <= 0 or abs(shape) < 0.5 * abs(check.measured):
+            return None
+        return round(float(check.measured), 2)
 
     def _outlines_read_upright(self) -> bool:
         """True only when the stem outlines are measurable and upright (FontCore.core_slant_measure)."""

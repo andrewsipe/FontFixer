@@ -155,3 +155,21 @@ def stair_font(style="Italic", declared=-15.0) -> TTFont:
 
 def test_a_stair_stepped_italic_keeps_its_angle_whatever_the_edges_say():
     assert angle(stair_font()) == pytest.approx(-15.0, abs=1.5)
+
+
+def test_a_flipped_sign_is_corrected_when_the_edges_and_the_shape_agree():
+    f = font(shear_degrees=13.0, style="Italic")
+    f["post"].italicAngle = 13.0  # the right lean, written with the wrong sign
+    assert FontStyleAnalyzer(f)._outlines_say_sign_flipped() == pytest.approx(-13.0, abs=0.5)
+    assert angle(f) == pytest.approx(-13.0, abs=0.5)
+
+
+def test_a_correct_angle_is_not_called_flipped():
+    f = font(shear_degrees=13.0, style="Italic")
+    f["post"].italicAngle = -13.0
+    assert FontStyleAnalyzer(f)._outlines_say_sign_flipped() is None
+
+
+def test_no_flip_when_the_whole_shape_does_not_lean_the_edges_way():
+    f = stair_font(declared=15.0)  # edges all vertical: not a flip case at all
+    assert FontStyleAnalyzer(f)._outlines_say_sign_flipped() is None

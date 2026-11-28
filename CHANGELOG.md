@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - A font whose outlines are upright but carries a wrong `post.italicAngle` now gets angle 0 and caret slope 0/1. The outlines decide: every long stem edge leans under half a degree and the whole letter shapes lean under 3 (FontCore `core_slant_measure`). This replaces the earlier rule that trusted a single glyph's area statistic, which wrote 17 and 34 degrees on fonts whose H has an off-centre crossbar, and the rule that kept a stored angle because the names said Italic (an Upright file named Italic held 11.93 for good).
+- A stored angle with the wrong sign (a right-leaning italic stored as +13) is set to the measured angle when the stem edges and the whole letter shapes agree on the lean. Where they disagree (a script whose edges lean but whose letters barely do, or a lean of about 3 degrees) the stored angle stays.
 - Stair-stepped and pixel italics (every long edge vertical, the letters leaning as a whole) and fonts with no straight stems to measure keep their stored angle as before, and the CFF `ItalicAngle` is synced to it.
 
 ## [1.7.1] - 2026-11-27
