@@ -75,8 +75,8 @@ def _slot(stem: str) -> tuple[str, str]:
     return stem, ""
 
 
-def filename_slope(path: str) -> Optional[str]:
-    _, slot = _slot(Path(path).stem)
+def filename_slope(path: str, name: Optional[str] = None) -> Optional[str]:
+    _, slot = _slot(Path(name or path).stem)
     if _ITALIC_WORD.search(slot):
         return "italic"
     if _UPRIGHT_WORD.search(slot):
@@ -84,9 +84,10 @@ def filename_slope(path: str) -> Optional[str]:
     return None
 
 
-def family_key(path: str, axes: tuple = ()) -> str:
-    """The folder, the filename with its slope words removed, and the non-slope axes."""
-    stem = re.sub(r"~\d+$", "", Path(path).stem)  # a ~001 suffix from a rename clash is not part of the name
+def family_key(path: str, axes: tuple = (), name: Optional[str] = None) -> str:
+    """The folder, the filename with its slope words removed, and the non-slope axes. ``name`` is the filename to read when
+    the file currently sits under another (a temporary name during a rename)."""
+    stem = re.sub(r"~\d+$", "", Path(name or path).stem)  # a ~001 suffix from a rename clash is not part of the name
     head, slot = _slot(stem)
     squashed = re.sub(r"[^a-z0-9]", "", (head + _SLOPE_WORDS.sub("", slot)).lower())
     return f"{Path(path).parent}|{squashed}|{axes}"
@@ -102,15 +103,16 @@ def _lean_of(font: Any) -> Optional[float]:
     return abs(shape) if shape is not None else None
 
 
-def gather_evidence(path: str) -> FontEvidence:
-    """Read one font. A font that cannot be read comes back with ``error`` set."""
+def gather_evidence(path: str, name: Optional[str] = None) -> FontEvidence:
+    """Read one font. A font that cannot be read comes back with ``error`` set. ``name`` is the filename it should be judged
+    by when the file sits under another name for now (a rename's temporary name)."""
     from fontTools.ttLib import TTFont
 
     from FontCore.core_variable_traits import _stat_vote, analyze_variable_traits
 
     try:
         font = TTFont(path, lazy=True, fontNumber=0, recalcTimestamp=False)
-        stem = Path(path).stem
+        stem = Path(name or path).stem
         stat = None
         free = False
         axes: tuple = ()
@@ -122,15 +124,15 @@ def gather_evidence(path: str) -> FontEvidence:
                                 if a.axisTag not in ("ital", "slnt")))
         else:
             stat = _stat_vote(font)
-        name = font["name"]
-        names = " ".join(filter(None, (name.getDebugName(i) for i in (2, 4, 6, 17))))
+        name_table = font["name"]
+        names = " ".join(filter(None, (name_table.getDebugName(i) for i in (2, 4, 6, 17))))
         os2 = font["OS/2"].fsSelection if "OS/2" in font else 0
         mac = font["head"].macStyle if "head" in font else 0
         return FontEvidence(
             path=path,
-            key=family_key(path, axes),
+            key=family_key(path, axes, name),
             stat=stat,
-            filename=filename_slope(path),
+            filename=filename_slope(path, name),
             names_italic=bool(_ITALIC_WORD.search(names)),
             bits_italic=bool(os2 & 1 or os2 & (1 << 9) or mac & 2),
             lean=None if free else _lean_of(font),
@@ -139,7 +141,7 @@ def gather_evidence(path: str) -> FontEvidence:
             free_slope=free,
         )
     except Exception as exc:  # unreadable or damaged: say so, go on
-        return FontEvidence(path=path, key=family_key(path), error=f"{type(exc).__name__}: {exc}")
+        return FontEvidence(path=path, key=family_key(path, (), name), error=f"{type(exc).__name__}: {exc}")
 
 
 def _score(e: FontEvidence) -> int:
@@ -278,4 +280,16 @@ def resolve_slopes(evidence: Iterable[FontEvidence]) -> list[SlopeDecision]:
     return list(out.values())
 
 
-__all__ = ["FontEvidence", "SlopeDecision", "gather_evidence", "resolve_slopes", "family_key", "filename_slope"]
+def clear_decisions(decisions: Iterable[SlopeDecision]) -> dict:
+    """path -> "italic" | "upright" for the decisions a tool may act on: not flagged, and not a free slope axis."""
+    import os
+
+    return {os.path.abspath(d.path): d.slope for d in decisions if not d.review and d.slope in ("upright", "italic")}
+
+
+def decide_slopes(paths: Iterable[str]) -> list[SlopeDecision]:
+    """Gather the evidence for these fonts and decide them together (one folder at a time keeps pairs together)."""
+    return resolve_slopes([gather_evidence(str(p)) for p in paths])
+
+
+__all__ = ["clear_decisions", "decide_slopes", "FontEvidence", "SlopeDecision", "gather_evidence", "resolve_slopes", "family_key", "filename_slope"]
