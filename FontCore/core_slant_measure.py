@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
 from fontTools.pens.recordingPen import DecomposingRecordingPen
+from fontTools.pens.statisticsPen import StatisticsPen
 
 # Letters whose long straight edges are stems. Serif brackets and terminals are short, so the length filter drops them.
 STEM_CHARS = "HIlEhnmuiLTbdpqkr"
@@ -23,6 +24,8 @@ AGREE_WITHIN = 1.5  # a declared angle this close to the measured one is right
 MIN_EDGE_UNITS = 0.22  # an edge counts when it is at least this fraction of the em long
 MAX_LEAN = 40.0  # an edge leaning further than this is not a stem edge
 MIN_SAMPLES = 4
+SHAPE_CHARS = "HIlEL"  # straight-sided letters: the whole-shape lean of these is the font's lean
+STAIR_GAP = 3.0  # edges say upright but the whole shape leans this far: a stair-stepped slant, not an upright
 
 
 @dataclass(frozen=True)
@@ -110,6 +113,33 @@ def measure_slant(font: Any) -> SlantMeasure:
     return SlantMeasure(round(median, 2) + 0.0, len(edges), round(spread, 2))
 
 
+def shape_slant(font: Any) -> Optional[float]:
+    """Median whole-shape lean (area statistics, italicAngle sign) of the straight-sided capitals, or None."""
+    try:
+        cmap = font.getBestCmap() or {}
+        glyph_set = font.getGlyphSet()
+    except Exception:
+        return None
+    leans = []
+    for ch in SHAPE_CHARS:
+        name = cmap.get(ord(ch))
+        if not name:
+            continue
+        try:
+            pen = StatisticsPen(glyph_set)
+            glyph_set[name].draw(pen)
+            if pen.slant:
+                leans.append(-math.degrees(math.atan(pen.slant)))
+            else:
+                leans.append(0.0)
+        except Exception:
+            continue
+    if len(leans) < 2:
+        return None
+    leans.sort()
+    return round(leans[len(leans) // 2], 2) + 0.0
+
+
 def check_slant(font: Any) -> SlantCheck:
     """Compare ``post.italicAngle`` with the measured lean."""
     declared = float(font["post"].italicAngle) if "post" in font else 0.0
@@ -120,6 +150,10 @@ def check_slant(font: Any) -> SlantCheck:
         return SlantCheck("unmeasurable", declared, m.measured, f"the stem edges disagree by {m.spread} degrees; not a reliable measure")
     upright = abs(m.measured) < UPRIGHT_LIMIT
     if upright:
+        shape = shape_slant(font)
+        if shape is not None and abs(shape) >= STAIR_GAP:
+            return SlantCheck("unmeasurable", declared, None,
+                              f"every long edge is vertical but the letters lean {shape:g} degrees as a whole (a stair-stepped slant)")
         if abs(declared) < 0.5:
             return SlantCheck("ok", declared, m.measured, "upright outlines, angle 0")
         return SlantCheck("upright-declared-slanted", declared, m.measured, f"outlines are upright but the font declares {declared:g} degrees")
