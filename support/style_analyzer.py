@@ -156,6 +156,14 @@ class FontStyleAnalyzer:
         - If none clear the floor but names say italic/oblique, keep a
           non-zero post.italicAngle instead of forcing 0
         """
+        # The outlines get the first word when they positively read upright: every long stem edge under half a degree
+        # (stricter than FontCore's 1, since this zeroes a stored angle) and the whole letter shapes under 3. One glyph's
+        # area statistic is not enough to write an angle: an H with an off-centre crossbar reads 17 degrees on vertical
+        # stems, and old versions wrote that. Names can be stale too (an Upright file named Italic kept 11.93 for good).
+        # Stair-stepped and pixel italics fail the shape test, so they fall through; so does a font with no straight stems.
+        if self._outlines_read_upright():
+            return 0.0
+
         samples: List[float] = []
         for glyph_name in self._iter_slant_glyph_names():
             angle = self._measure_glyph_angle(glyph_name)
@@ -184,13 +192,7 @@ class FontStyleAnalyzer:
                 return round(samples[0], 2)
             return round(float(median(samples)), 2)
 
-        # Measurement failed or stayed under the floor. Names can be stale (an Upright file that was named Italic keeps its
-        # wrong angle forever), so the outlines get the last word, but only when they positively read upright: the stems
-        # of H, I, l, E and the rest lean under half a degree (stricter than FontCore's 1, since this zeroes a stored angle). A font with no straight stems cannot be measured, and an
-        # italic named as one keeps its stored angle (below).
-        if self._outlines_read_upright() and not self._named_italic_with_italic_lean():
-            return 0.0
-
+        # Measurement failed or stayed under the floor.
         # Do not zero out a named italic/oblique that already carries a post angle.
         if self._name_implies_italic() or self._name_implies_oblique():
             if "post" in self.font:
@@ -202,17 +204,6 @@ class FontStyleAnalyzer:
                     return round(post_angle, 2)
 
         return 0.0
-
-    def _named_italic_with_italic_lean(self) -> bool:
-        """An italic-named font whose stored angle leans the italic way (-1 degree or more to the right). Stair-stepped
-        and pixel italics (AM_BobbyDigital) have no long slanted edge to measure, so upright-looking stems prove nothing
-        there. A positive stored angle on an italic name is not an italic lean, so it can still be corrected."""
-        if not (self._name_implies_italic() or self._name_implies_oblique()) or "post" not in self.font:
-            return False
-        try:
-            return float(self.font["post"].italicAngle or 0.0) <= -1.0
-        except (TypeError, ValueError):
-            return False
 
     def _outlines_read_upright(self) -> bool:
         """True only when the stem outlines are measurable and upright (FontCore.core_slant_measure)."""

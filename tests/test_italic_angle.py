@@ -122,7 +122,36 @@ def test_an_italic_with_nothing_measurable_keeps_its_stored_angle():
     assert angle(f) == pytest.approx(-9.0, abs=0.1)
 
 
-def test_an_italic_named_font_with_a_right_leaning_angle_and_unmeasurable_upright_stems_keeps_its_angle():
-    f = font(style="Italic")  # stems read upright, like a stair-stepped pixel italic
-    f["post"].italicAngle = -15.0
-    assert angle(f) == pytest.approx(-15.0, abs=0.1)
+def stair_font(style="Italic", declared=-15.0) -> TTFont:
+    """H and I built from 100-tall blocks, each shifted right 25 units: every long edge is vertical, the letter leans."""
+    def stairs():
+        pen = TTGlyphPen(None)
+        left, right, x = [], [], 0
+        for i in range(8):
+            y0, y1 = i * 100, (i + 1) * 100
+            left += [(x, y0), (x, y1)]
+            right += [(x + 100, y0), (x + 100, y1)]
+            x += 25
+        pen.moveTo(left[0])
+        for pt in left[1:]:
+            pen.lineTo(pt)
+        for pt in reversed(right):
+            pen.lineTo(pt)
+        pen.closePath()
+        return pen.glyph()
+
+    order = [".notdef", "H", "I", "l", "E"]
+    fb = FontBuilder(1000, isTTF=True)
+    fb.setupGlyphOrder(order)
+    fb.setupCharacterMap({ord(c): c for c in "HIlE"})
+    fb.setupGlyf({n: (TTGlyphPen(None).glyph() if n == ".notdef" else stairs()) for n in order})
+    fb.setupHorizontalMetrics({g: (700, 50) for g in order})
+    fb.setupHorizontalHeader(ascent=900, descent=-250)
+    fb.setupNameTable({"familyName": "Probe", "styleName": style})
+    fb.setupOS2()
+    fb.setupPost(italicAngle=declared)
+    return fb.font
+
+
+def test_a_stair_stepped_italic_keeps_its_angle_whatever_the_edges_say():
+    assert angle(stair_font()) == pytest.approx(-15.0, abs=1.5)
