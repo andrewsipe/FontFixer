@@ -5,6 +5,12 @@ All notable changes to FontFixer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-11-27
+
+### Added
+- Upright and Italic are now decided once for the whole run, before any font is changed. FontFixer groups the fonts by name (slope words taken out), finds each Upright/Italic pair, and compares them: STAT first, then which one's outlines lean more, then the filename, names and flags. The decision sets the italic flag. A font alone in its family stays Upright unless its outlines are shown to be upright, in which case stale italic flags are cleared. FontCore's `core_slope_resolver` makes the decision, so FontFixer, FileRenamer and fontnameid can share it.
+- A start-of-run line says how many pairs were matched and how many fonts were left to their own tables. Those are fonts the resolver flags: unmeasurable outlines, conflicting evidence, three or more files with one name, a pair that is two slanted files, and a free slope axis. They follow the names and tables as before. `tools/resolve_slopes.py` in FontCore lists them with the reason.
+
 ## [1.7.2] - 2026-11-27
 
 ### Fixed

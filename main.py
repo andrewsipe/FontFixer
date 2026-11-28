@@ -70,6 +70,7 @@ from FontFixer.support.data_models import (
     ALL_HANDLERS,
     _get_handler_spec_by_full_name,
 )
+from FontFixer.support.style_analyzer import set_slope_decisions
 from FontFixer.support.family_slant_review import (
     run_family_slant_review,
     style_handler_enabled,
@@ -165,6 +166,7 @@ class ProcessingConfig:
     quarantine_enabled: bool
     quarantine_dir: Optional[Path]
     input_root: Path
+    slope_decisions: dict = field(default_factory=dict)  # path -> "italic" | "upright", from the slope resolver
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> "ProcessingConfig":
@@ -389,9 +391,38 @@ def parse_and_validate_arguments() -> ProcessingConfig:
 # ============================================================================
 
 
+def resolve_slope_decisions(config: ProcessingConfig, font_paths: list[Path]) -> dict:
+    """Decide Upright or Italic for every font together, so a font and its partner are compared. Returns path -> slope for
+    the decisions that are clear; a font the resolver flags, or that has a free slope axis, is left to its own tables."""
+    if not style_handler_enabled(config.enabled_handlers) or len(font_paths) == 0:
+        return {}
+    try:
+        from FontCore.core_slope_resolver import gather_evidence, resolve_slopes
+
+        paths = [str(p) for p in font_paths]
+        if config.num_workers > 1 and len(paths) > 64:
+            with ProcessPoolExecutor(max_workers=config.num_workers) as executor:
+                evidence = list(executor.map(gather_evidence, paths, chunksize=32))
+        else:
+            evidence = [gather_evidence(p) for p in paths]
+        decisions = resolve_slopes(evidence)
+    except Exception as exc:  # the resolver must never stop a run: fall back to the names and tables
+        cs.StatusIndicator("warning").add_message(f"Slope pairing skipped: {type(exc).__name__}: {exc}").emit(console)
+        return {}
+    clear = {os.path.abspath(d.path): d.slope for d in decisions if not d.review and d.slope in ("upright", "italic")}
+    flagged = sum(1 for d in decisions if d.review)
+    pairs = sum(1 for d in decisions if d.role == "pair" and not d.review) // 2
+    cs.StatusIndicator("info").add_message(
+        f"Slope: {cs.fmt_count(pairs)} Upright/Italic pair(s) matched; {cs.fmt_count(flagged)} font(s) left to their own tables "
+        "(run FontCore's tools/resolve_slopes.py to see why)"
+    ).emit(console)
+    return clear
+
+
 def process_font_wrapper(args: Tuple[Path, ProcessingConfig]) -> Dict:
     """Wrapper for multiprocessing (must accept a single pickleable argument)."""
     font_path, config = args
+    set_slope_decisions(config.slope_decisions)
     fixer = FontFixer(
         verbose=config.verbose,
         enabled_handlers=config.enabled_handlers,
@@ -490,6 +521,9 @@ def main():
     # Display preflight info
     display_preflight_info(config, font_paths)
 
+    # One Upright/Italic decision for the whole run, made before any font is changed (FontCore slope resolver)
+    config.slope_decisions = resolve_slope_decisions(config, font_paths)
+
     cs.emit("")
     cs.StatusIndicator("info").add_message(
         f"Processing with {cs.fmt_count(config.num_workers)} worker(s)..."
@@ -587,6 +621,7 @@ def _process_sequential(config: ProcessingConfig, font_paths: list[Path]) -> lis
 
         _display_handler_list(config)
 
+        set_slope_decisions(config.slope_decisions)
         fixer = FontFixer(
             verbose=config.verbose,
             enabled_handlers=config.enabled_handlers,

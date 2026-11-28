@@ -8,6 +8,7 @@ characteristics including italic angle, bold weight, and oblique vs italic disti
 from __future__ import annotations
 
 import math
+import os
 import re
 from pathlib import Path
 from statistics import median
@@ -39,6 +40,22 @@ _SLANT_NAME_FALLBACKS: Sequence[str] = (
 )
 
 _NAME_IDS_STYLE = (1, 2, 4, 6, 16, 17)
+
+
+# Slope decisions for this run, by absolute path: "italic" or "upright". Set once per run (main) and once per worker, from
+# FontCore.core_slope_resolver. Only decisions the resolver is sure of are here; a font that is not listed follows the names
+# and tables as before.
+_SLOPE_DECISIONS: dict = {}
+
+
+def set_slope_decisions(decisions: Optional[dict]) -> None:
+    global _SLOPE_DECISIONS
+    _SLOPE_DECISIONS = dict(decisions or {})
+
+
+def _font_path(font) -> Optional[str]:
+    path = getattr(getattr(getattr(font, "reader", None), "file", None), "name", None)
+    return os.path.abspath(path) if isinstance(path, str) else None
 
 
 class FontStyleAnalyzer:
@@ -283,6 +300,15 @@ class FontStyleAnalyzer:
                     self._is_oblique = bool(traits.slope_word) and traits.slope_word.lower() == "oblique"
             except Exception:
                 pass  # keep the name-based answer
+
+        # The family-wide decision (core_slope_resolver) settles Upright or Italic when the font and its partner were
+        # compared and the answer is clear. It changes only the italic flag: an Oblique name stays Oblique.
+        decided = _SLOPE_DECISIONS.get(_font_path(self.font) or "")
+        if decided == "italic":
+            self._is_italic = True
+        elif decided == "upright":
+            self._is_italic = False
+            self._is_oblique = False
 
         # Bold: the word "Bold" in the style, nothing else. usWeightClass is not used (a Semibold is often 700
         # too), matching fontnameid, so running one tool after the other does not flip the flags back.
