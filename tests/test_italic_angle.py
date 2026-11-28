@@ -173,3 +173,9 @@ def test_a_correct_angle_is_not_called_flipped():
 def test_no_flip_when_the_whole_shape_does_not_lean_the_edges_way():
     f = stair_font(declared=15.0)  # edges all vertical: not a flip case at all
     assert FontStyleAnalyzer(f)._outlines_say_sign_flipped() is None
+
+
+def test_a_shallow_lean_under_the_statistic_floor_keeps_its_measured_angle():
+    f = font(shear_degrees=1.4, style="Regular")
+    f["post"].italicAngle = 1.4  # wrong sign; the statistic (under 2) would zero it
+    assert angle(f) == pytest.approx(-1.4, abs=0.4)

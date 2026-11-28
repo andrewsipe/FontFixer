@@ -195,6 +195,13 @@ class FontStyleAnalyzer:
                 return round(samples[0], 2)
             return round(float(median(samples)), 2)
 
+        # The per-glyph statistic stayed under its 2 degree floor, but the stem edges may still show a real, shallow lean
+        # (Giblin leans 2 to 3.7 degrees): keep that measured angle rather than zeroing it. Only a font the edges measure
+        # reliably at 1 degree or more gets here with a value; anything else falls through.
+        edge_lean = self._outlines_shallow_lean()
+        if edge_lean is not None:
+            return edge_lean
+
         # Measurement failed or stayed under the floor.
         # Do not zero out a named italic/oblique that already carries a post angle.
         if self._name_implies_italic() or self._name_implies_oblique():
@@ -207,6 +214,18 @@ class FontStyleAnalyzer:
                     return round(post_angle, 2)
 
         return 0.0
+
+    def _outlines_shallow_lean(self) -> Optional[float]:
+        """The edge-measured angle when the stems reliably lean 1 degree or more, else None (FontCore.core_slant_measure)."""
+        try:
+            from FontCore.core_slant_measure import UPRIGHT_LIMIT, check_slant
+
+            check = check_slant(self.font)
+        except Exception:
+            return None
+        if check.verdict == "unmeasurable" or check.measured is None or abs(check.measured) < UPRIGHT_LIMIT:
+            return None
+        return round(float(check.measured), 2)
 
     def _outlines_say_sign_flipped(self) -> Optional[float]:
         """The measured angle when the stored one is the same lean with the wrong sign and two measures agree on it.
